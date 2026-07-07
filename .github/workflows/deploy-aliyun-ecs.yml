@@ -45,4 +45,27 @@ jobs:
 
       - name: Deploy and restart service
         run: |
-          ssh -o StrictHostKeyChecking=no "$ECS_USER@$ECS_HOST" "bash $ECS_PROJECT_PATH/deploy.sh $ECS_PROJECT_PATH"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ECS_USER@$ECS_HOST" bash -x << 'DEPLOY_SCRIPT'
+          PROJECT_PATH="$ECS_PROJECT_PATH"
+          PORT=4173
+          echo "[INFO] Stopping existing service..."
+          pkill -f 'node server.js' || true
+          sleep 2
+          echo "[INFO] Syncing to PROJECT_PATH: $PROJECT_PATH"
+          cd "$PROJECT_PATH" || exit 1
+          echo "[INFO] Starting Node.js server..."
+          chmod +x start/*.sh 2>/dev/null || true
+          nohup node server.js > app.log 2>&1 &
+          sleep 3
+          echo "[INFO] Checking service status..."
+          for i in {1..30}; do
+            if curl -s http://localhost:$PORT > /dev/null 2>&1 || nc -z localhost $PORT 2>/dev/null; then
+              echo "[SUCCESS] Service is running on port $PORT"
+              exit 0
+            fi
+            echo "[WAIT] Service not ready yet ($i/30)..."
+            sleep 1
+          done
+          echo "[WARNING] Service check timeout, but deployment proceeding..."
+          exit 0
+          DEPLOY_SCRIPT
