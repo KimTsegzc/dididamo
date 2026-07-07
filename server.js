@@ -1,8 +1,9 @@
-const http = require("http");
+﻿const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const PORT = 4173;
+const PORT = Number(process.env.PORT || 4173);
+const HOST = process.env.HOST || "0.0.0.0";
 const root = __dirname;
 
 const mime = {
@@ -39,6 +40,11 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`MotoFlow MVP running at http://localhost:${PORT}`);
+server.on("error", (error) => {
+  console.error("Server failed to start:", error);
+  process.exit(1);
+});
+
+server.listen(PORT, HOST, () => {
+  console.log(`MotoFlow MVP running at http://${HOST}:${PORT}`);
 });
