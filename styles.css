@@ -1,0 +1,261 @@
+:root {
+  --bg: #e8f1ff;
+  --ink: #15213b;
+  --line: rgba(21, 33, 59, 0.15);
+  --card: rgba(255, 255, 255, 0.88);
+  --pri: #00695c;
+  --pri-2: #00acc1;
+  --warn: #f9a825;
+  --ok: #2e7d32;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Outfit", sans-serif;
+  color: var(--ink);
+  background: linear-gradient(145deg, #dbe8ff 0%, #ecf8f2 100%);
+}
+
+.bg-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(10px);
+  opacity: 0.35;
+  animation: hover 8s ease-in-out infinite;
+}
+
+.b1 {
+  width: 260px;
+  height: 260px;
+  left: -60px;
+  top: -30px;
+  background: #80cbc4;
+}
+
+.b2 {
+  width: 360px;
+  height: 360px;
+  right: -100px;
+  bottom: -40px;
+  background: #81d4fa;
+  animation-delay: 1.5s;
+}
+
+@keyframes hover {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.phone-wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+.phone-shell {
+  width: min(420px, 100%);
+  margin: 0 auto;
+  min-height: calc(100vh - 28px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.72));
+  box-shadow: 0 24px 55px rgba(20, 35, 54, 0.22);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.mobile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-family: "Ma Shan Zheng", cursive;
+  font-size: 28px;
+  color: #004d40;
+  line-height: 1;
+}
+
+.sub {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.screen {
+  padding: 12px;
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-foot {
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.mobile-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px;
+}
+
+.tab {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 12px;
+  padding: 8px 4px;
+}
+
+.tab.active {
+  background: linear-gradient(135deg, var(--pri) 0%, var(--pri-2) 100%);
+  color: #fff;
+  border-color: transparent;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 12px;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.muted {
+  margin: 2px 0;
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+.map {
+  min-height: 190px;
+  border: 1px dashed #80a6b8;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: linear-gradient(160deg, #e3f2fd, #e8f5e9);
+  padding: 10px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px dashed var(--line);
+  padding: 8px 0;
+}
+
+.btn {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--pri), var(--pri-2));
+  color: #fff;
+  padding: 10px;
+  font-weight: 600;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.btn.alt {
+  background: #ffffff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.badge.ok { background: #c8e6c9; color: #1b5e20; }
+.badge.warn { background: #ffe082; color: #5d4037; }
+.badge.info { background: #b3e5fc; color: #01579b; }
+
+input, select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #fff;
+  margin-top: 6px;
+}
+
+.dock {
+  width: min(420px, 100%);
+  margin: 0 auto;
+}
+
+.dock-card {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.86);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.dock-card h3 {
+  margin: 0 0 8px;
+}
+
+.note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 860px) {
+  .phone-wrap {
+    grid-template-columns: 420px 320px;
+    align-items: start;
+    justify-content: center;
+    padding-top: 24px;
+  }
+
+  .phone-shell {
+    min-height: 860px;
+  }
+
+  .dock {
+    margin: 0;
+  }
+}
