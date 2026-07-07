@@ -25,20 +25,24 @@ jobs:
       - name: Configure SSH key
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.ECS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.ECS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "$ECS_HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "$ECS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Sync project files to ECS
         run: |
-          rsync -az --delete \
+          if ! command -v rsync &> /dev/null; then
+            apt-get update && apt-get install -y rsync
+          fi
+          rsync -avz --delete \
             --exclude '.git' \
             --exclude '.github' \
             --exclude 'node_modules' \
             --exclude 'start/.server-pid.txt' \
             --exclude '*.log' \
+            --exclude 'nohup.out' \
             ./ "$ECS_USER@$ECS_HOST:$ECS_PROJECT_PATH/"
 
-      - name: Restart app on ECS
+      - name: Deploy and restart service
         run: |
-          ssh -o StrictHostKeyChecking=no "$ECS_USER@$ECS_HOST" "cd $ECS_PROJECT_PATH && pkill -f 'node server.js' || true && sleep 2 && nohup node server.js > app.log 2>&1 & echo 'Service started, waiting...' && sleep 3 && for i in {1..30}; do curl -s http://localhost:4173 > /dev/null && echo 'Service ready!' && exit 0; sleep 1; done; echo 'Service startup completed'"
+          ssh -o StrictHostKeyChecking=no "$ECS_USER@$ECS_HOST" "bash $ECS_PROJECT_PATH/deploy.sh $ECS_PROJECT_PATH"
