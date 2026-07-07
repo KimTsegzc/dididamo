@@ -44,28 +44,34 @@ jobs:
             ./ "$ECS_USER@$ECS_HOST:$ECS_PROJECT_PATH/"
 
       - name: Deploy and restart service
+        env:
+          PROJECT_PATH: ${{ secrets.ECS_PROJECT_PATH }}
+          PORT: 4173
         run: |
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ECS_USER@$ECS_HOST" bash -x << 'DEPLOY_SCRIPT'
-          PROJECT_PATH="$ECS_PROJECT_PATH"
-          PORT=4173
-          echo "[INFO] Stopping existing service..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$ECS_USER@$ECS_HOST" << EOF
+          set -e
+          PROJECT_PATH="$PROJECT_PATH"
+          PORT="$PORT"
+          echo "[1] Stopping existing Node.js process..."
           pkill -f 'node server.js' || true
           sleep 2
-          echo "[INFO] Syncing to PROJECT_PATH: $PROJECT_PATH"
-          cd "$PROJECT_PATH" || exit 1
-          echo "[INFO] Starting Node.js server..."
+          echo "[2] Navigating to project: \$PROJECT_PATH"
+          cd "\$PROJECT_PATH" || { echo "ERROR: Directory not found!"; exit 1; }
+          pwd
+          ls -la
+          echo "[3] Starting Node.js server on port \$PORT..."
           chmod +x start/*.sh 2>/dev/null || true
           nohup node server.js > app.log 2>&1 &
+          echo "[4] Waiting for service to be ready..."
           sleep 3
-          echo "[INFO] Checking service status..."
-          for i in {1..30}; do
-            if curl -s http://localhost:$PORT > /dev/null 2>&1 || nc -z localhost $PORT 2>/dev/null; then
-              echo "[SUCCESS] Service is running on port $PORT"
+          for i in {1..20}; do
+            if curl -s http://localhost:\$PORT > /dev/null 2>&1; then
+              echo "[SUCCESS] Service is running!"
               exit 0
             fi
-            echo "[WAIT] Service not ready yet ($i/30)..."
+            echo "  Attempt \$i/20..."
             sleep 1
           done
-          echo "[WARNING] Service check timeout, but deployment proceeding..."
+          echo "[WARNING] Service check timeout"
           exit 0
-          DEPLOY_SCRIPT
+          EOF
