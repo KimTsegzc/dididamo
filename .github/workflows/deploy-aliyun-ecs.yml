@@ -41,24 +41,4 @@ jobs:
 
       - name: Restart app on ECS
         run: |
-          ssh "$ECS_USER@$ECS_HOST" << 'EOFSH'
-          set -e
-          cd '$ECS_PROJECT_PATH'
-          echo "Stopping existing service..."
-          pkill -f 'node server.js' || true
-          sleep 2
-          echo "Starting new service..."
-          chmod +x start/*.sh || true
-          nohup node server.js > app.log 2>&1 &
-          sleep 3
-          echo "Waiting for service to be ready..."
-          for i in {1..30}; do
-            if nc -z localhost 4173 2>/dev/null; then
-              echo "✅ Service is ready on port 4173!"
-              break
-            fi
-            echo "Service not ready yet ($i/30)... waiting"
-            sleep 1
-          done
-          echo "Deployment completed"
-          EOFSH
+          ssh -o StrictHostKeyChecking=no "$ECS_USER@$ECS_HOST" "cd $ECS_PROJECT_PATH && pkill -f 'node server.js' || true && sleep 2 && nohup node server.js > app.log 2>&1 & echo 'Service started, waiting...' && sleep 3 && for i in {1..30}; do curl -s http://localhost:4173 > /dev/null && echo 'Service ready!' && exit 0; sleep 1; done; echo 'Service startup completed'"
