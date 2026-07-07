@@ -1,4 +1,4 @@
-name: Deploy to Aliyun ECS
+﻿name: Deploy to Aliyun ECS
 
 on:
   push:
@@ -13,6 +13,7 @@ env:
   ECS_HOST: ${{ secrets.ECS_HOST }}
   ECS_USER: ${{ secrets.ECS_USER }}
   ECS_PROJECT_PATH: ${{ secrets.ECS_PROJECT_PATH }}
+  PORT: 4173
 
 jobs:
   deploy:
@@ -20,21 +21,36 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Configure SSH key
+      - name: Validate required secrets
+        run: |
+          test -n "$ECS_HOST" || (echo "[ERR] ECS_HOST is empty" && exit 1)
+          test -n "$ECS_USER" || (echo "[ERR] ECS_USER is empty" && exit 1)
+          test -n "$ECS_PROJECT_PATH" || (echo "[ERR] ECS_PROJECT_PATH is empty" && exit 1)
+          test -n "${{ secrets.ECS_SSH_PRIVATE_KEY }}" || (echo "[ERR] ECS_SSH_PRIVATE_KEY is empty" && exit 1)
+
+      - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.ECS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 700 ~/.ssh
+          printf '%s' "${{ secrets.ECS_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "$ECS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: SSH connectivity preflight
+        run: |
+          ssh -i ~/.ssh/id_rsa \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=20 \
+            -o BatchMode=yes \
+            "$ECS_USER@$ECS_HOST" \
+            "echo '[OK] SSH connected'; whoami; mkdir -p '$ECS_PROJECT_PATH'"
 
       - name: Sync project files to ECS
         run: |
-          if ! command -v rsync &> /dev/null; then
-            apt-get update && apt-get install -y rsync
-          fi
-          rsync -avz --delete \
+          RSYNC_RSH="ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=20 -o BatchMode=yes"
+          rsync -avz --delete -e "$RSYNC_RSH" \
             --exclude '.git' \
             --exclude '.github' \
             --exclude 'node_modules' \
@@ -43,35 +59,22 @@ jobs:
             --exclude 'nohup.out' \
             ./ "$ECS_USER@$ECS_HOST:$ECS_PROJECT_PATH/"
 
-      - name: Deploy and restart service
-        env:
-          PROJECT_PATH: ${{ secrets.ECS_PROJECT_PATH }}
-          PORT: 4173
+      - name: Restart service
         run: |
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$ECS_USER@$ECS_HOST" << EOF
-          set -e
-          PROJECT_PATH="$PROJECT_PATH"
-          PORT="$PORT"
-          echo "[1] Stopping existing Node.js process..."
-          pkill -f 'node server.js' || true
-          sleep 2
-          echo "[2] Navigating to project: \$PROJECT_PATH"
-          cd "\$PROJECT_PATH" || { echo "ERROR: Directory not found!"; exit 1; }
-          pwd
-          ls -la
-          echo "[3] Starting Node.js server on port \$PORT..."
-          chmod +x start/*.sh 2>/dev/null || true
-          nohup node server.js > app.log 2>&1 &
-          echo "[4] Waiting for service to be ready..."
-          sleep 3
-          for i in {1..20}; do
-            if curl -s http://localhost:\$PORT > /dev/null 2>&1; then
-              echo "[SUCCESS] Service is running!"
-              exit 0
-            fi
-            echo "  Attempt \$i/20..."
-            sleep 1
-          done
-          echo "[WARNING] Service check timeout"
-          exit 0
-          EOF
+          ssh -i ~/.ssh/id_rsa \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=20 \
+            -o BatchMode=yes \
+            "$ECS_USER@$ECS_HOST" \
+            "set -e; cd '$ECS_PROJECT_PATH'; pkill -f 'node server.js' || true; nohup node server.js > app.log 2>&1 &"
+
+      - name: Health check on ECS
+        run: |
+          ssh -i ~/.ssh/id_rsa \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=20 \
+            -o BatchMode=yes \
+            "$ECS_USER@$ECS_HOST" \
+            "for i in {1..30}; do curl -fsS http://localhost:$PORT >/dev/null && echo '[OK] service up' && exit 0; sleep 1; done; echo '[ERR] service not up'; tail -n 120 '$ECS_PROJECT_PATH/app.log' || true; exit 1"
