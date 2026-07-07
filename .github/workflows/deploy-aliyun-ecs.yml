@@ -13,16 +13,13 @@ env:
   ECS_HOST: ${{ secrets.ECS_HOST }}
   ECS_USER: ${{ secrets.ECS_USER }}
   ECS_PROJECT_PATH: ${{ secrets.ECS_PROJECT_PATH }}
-  PORT: 4173
+  APP_PORT: 4173
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
       - name: Validate required secrets
         run: |
           test -n "$ECS_HOST" || (echo "[ERR] ECS_HOST is empty" && exit 1)
@@ -37,7 +34,7 @@ jobs:
           printf '%s' "${{ secrets.ECS_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      - name: SSH connectivity preflight
+      - name: SSH preflight
         run: |
           ssh -i ~/.ssh/id_rsa \
             -o StrictHostKeyChecking=no \
@@ -45,21 +42,13 @@ jobs:
             -o ConnectTimeout=20 \
             -o BatchMode=yes \
             "$ECS_USER@$ECS_HOST" \
-            "echo '[OK] SSH connected'; whoami; mkdir -p '$ECS_PROJECT_PATH'"
+            "echo '[OK] SSH connected'; whoami; uname -a"
 
-      - name: Sync project files to ECS
-        run: |
-          RSYNC_RSH="ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=20 -o BatchMode=yes"
-          rsync -avz --delete -e "$RSYNC_RSH" \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude 'node_modules' \
-            --exclude 'start/.server-pid.txt' \
-            --exclude '*.log' \
-            --exclude 'nohup.out' \
-            ./ "$ECS_USER@$ECS_HOST:$ECS_PROJECT_PATH/"
-
-      - name: Restart service
+      - name: Deploy on ECS by git pull and restart script
+        env:
+          REPO_URL: https://github.com/${{ github.repository }}.git
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           ssh -i ~/.ssh/id_rsa \
             -o StrictHostKeyChecking=no \
@@ -67,9 +56,31 @@ jobs:
             -o ConnectTimeout=20 \
             -o BatchMode=yes \
             "$ECS_USER@$ECS_HOST" \
-            "set -e; cd '$ECS_PROJECT_PATH'; pkill -f 'node server.js' || true; nohup node server.js > app.log 2>&1 &"
+            "REPO_URL='$REPO_URL' PROJECT_PATH='$ECS_PROJECT_PATH' REF_TYPE='$REF_TYPE' REF_NAME='$REF_NAME' bash -s" << 'EOF'
+          set -e
+          mkdir -p "$PROJECT_PATH"
 
-      - name: Health check on ECS
+          if [ ! -d "$PROJECT_PATH/.git" ]; then
+            git clone "$REPO_URL" "$PROJECT_PATH"
+          fi
+
+          cd "$PROJECT_PATH"
+          git fetch --all --tags
+
+          if [ "$REF_TYPE" = "tag" ]; then
+            git checkout -f "$REF_NAME"
+          else
+            git checkout -f main
+            git pull --ff-only origin main
+          fi
+
+          chmod +x start/*.sh || true
+          bash start/restart.sh
+
+          echo "[INFO] Deployed commit: $(git rev-parse --short HEAD)"
+          EOF
+
+      - name: Health check on ECS (localhost)
         run: |
           ssh -i ~/.ssh/id_rsa \
             -o StrictHostKeyChecking=no \
@@ -77,4 +88,17 @@ jobs:
             -o ConnectTimeout=20 \
             -o BatchMode=yes \
             "$ECS_USER@$ECS_HOST" \
-            "for i in {1..30}; do curl -fsS http://localhost:$PORT >/dev/null && echo '[OK] service up' && exit 0; sleep 1; done; echo '[ERR] service not up'; tail -n 120 '$ECS_PROJECT_PATH/app.log' || true; exit 1"
+            "for i in {1..30}; do curl -fsS http://localhost:$APP_PORT >/dev/null && echo '[OK] service up on localhost' && exit 0; sleep 1; done; echo '[ERR] localhost health failed'; tail -n 120 '$ECS_PROJECT_PATH/app.log' || true; exit 1"
+
+      - name: Health check from public network
+        run: |
+          for i in {1..20}; do
+            if curl -fsS "http://$ECS_HOST:$APP_PORT" >/dev/null; then
+              echo "[OK] public health passed: http://$ECS_HOST:$APP_PORT"
+              exit 0
+            fi
+            echo "[WAIT] public health retry ($i/20)"
+            sleep 2
+          done
+          echo "[ERR] public health failed: http://$ECS_HOST:$APP_PORT"
+          exit 1
