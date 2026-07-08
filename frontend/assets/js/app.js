@@ -53,6 +53,143 @@ const roleTabs = {
   ]
 };
 
+const mapRuntime = {
+  bootstrap: null,
+  sdkLoading: null,
+  sdkUrl: "",
+  map: null,
+  mapContainerId: "",
+  renderToken: 0
+};
+
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+async function fetchTencentBootstrap() {
+  if (mapRuntime.bootstrap) return mapRuntime.bootstrap;
+  const resp = await fetch("/api/tencent/bootstrap");
+  if (!resp.ok) throw new Error("无法读取腾讯地图配置");
+  mapRuntime.bootstrap = await resp.json();
+  return mapRuntime.bootstrap;
+}
+
+async function loadTencentSdk() {
+  const boot = await fetchTencentBootstrap();
+  if (!boot.keyReady || !boot.jsApiUrl) {
+    throw new Error("腾讯地图 Key 未配置");
+  }
+
+  if (window.TMap) return boot;
+  if (mapRuntime.sdkLoading && mapRuntime.sdkUrl === boot.jsApiUrl) {
+    await mapRuntime.sdkLoading;
+    return boot;
+  }
+
+  mapRuntime.sdkUrl = boot.jsApiUrl;
+  mapRuntime.sdkLoading = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = boot.jsApiUrl;
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => reject(new Error("腾讯地图 SDK 加载失败"));
+    document.head.appendChild(script);
+  });
+
+  await mapRuntime.sdkLoading;
+  if (!window.TMap) {
+    throw new Error("腾讯地图 SDK 未正确初始化");
+  }
+  return boot;
+}
+
+function getMapScene() {
+  const tab = roleTabs[state.role][state.index]?.id;
+  if (state.role === "passenger" && tab === "trip") {
+    return { lat: 22.543096, lng: 114.057865, zoom: 13, pitch: 28, rotation: 8 };
+  }
+  if (state.role === "driver") {
+    return { lat: 22.552023, lng: 114.093632, zoom: 12, pitch: 35, rotation: 15 };
+  }
+  return { lat: 22.543096, lng: 114.057865, zoom: 14, pitch: 30, rotation: 20 };
+}
+
+function showMapMessage(canvas, message) {
+  canvas.innerHTML = `<div class="map-empty">${escapeHtml(message)}</div>`;
+}
+
+async function mountMainMap(token) {
+  const canvas = document.querySelector(".js-main-map");
+  if (!canvas) {
+    if (mapRuntime.map && typeof mapRuntime.map.destroy === "function") {
+      mapRuntime.map.destroy();
+    }
+    mapRuntime.map = null;
+    mapRuntime.mapContainerId = "";
+    return;
+  }
+
+  if (!state.mapConfig.enabled) {
+    showMapMessage(canvas, "地图未配置，请在后台端系统设置中保存腾讯 Key");
+    return;
+  }
+
+  try {
+    await loadTencentSdk();
+  } catch (error) {
+    showMapMessage(canvas, error.message || "地图加载失败");
+    return;
+  }
+
+  if (token !== mapRuntime.renderToken) return;
+
+  const tab = roleTabs[state.role][state.index]?.id || "main";
+  if (!canvas.id) {
+    canvas.id = `main-map-${state.role}-${tab}`;
+  }
+
+  const scene = getMapScene();
+  const center = new TMap.LatLng(scene.lat, scene.lng);
+
+  try {
+    if (mapRuntime.map && mapRuntime.mapContainerId !== canvas.id) {
+      if (typeof mapRuntime.map.destroy === "function") {
+        mapRuntime.map.destroy();
+      }
+      mapRuntime.map = null;
+    }
+
+    if (!mapRuntime.map) {
+      mapRuntime.map = new TMap.Map(canvas.id, {
+        center,
+        zoom: scene.zoom,
+        pitch: scene.pitch,
+        rotation: scene.rotation
+      });
+      mapRuntime.mapContainerId = canvas.id;
+    } else {
+      mapRuntime.map.setCenter(center);
+      if (typeof mapRuntime.map.setZoom === "function") {
+        mapRuntime.map.setZoom(scene.zoom);
+      }
+    }
+  } catch (error) {
+    showMapMessage(canvas, error.message || "地图渲染失败");
+  }
+}
+
+function refreshMainMap() {
+  const token = ++mapRuntime.renderToken;
+  setTimeout(() => {
+    mountMainMap(token);
+  }, 0);
+}
+
 function badge(status) {
   const map = {
     idle: ["待下单", "info"],
@@ -68,9 +205,10 @@ function badge(status) {
 
 function mapBox(note) {
   return `
-    <div class="map">
-      <div>
-        <div><strong>地图区域（腾讯集成占位）</strong></div>
+    <div class="map-shell">
+      <div class="map-canvas js-main-map"></div>
+      <div class="map-tip">
+        <div><strong>腾讯地图主视图</strong></div>
         <div class="muted">地图配置: ${state.mapConfig.enabled ? "后端已配置" : "后端未配置"}</div>
         <div class="muted">${note}</div>
       </div>
@@ -410,6 +548,7 @@ function render() {
   renderTabs();
   renderView();
   renderMeta();
+  refreshMainMap();
 }
 
 async function loadPublicConfig() {

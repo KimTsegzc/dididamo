@@ -27,7 +27,7 @@ function send(res, code, body, type = "text/plain; charset=utf-8") {
 
 function readRuntimeConfig() {
   try {
-    const raw = fs.readFileSync(configFile, "utf-8");
+    const raw = fs.readFileSync(configFile, "utf-8").replace(/^\uFEFF/, "");
     const data = JSON.parse(raw);
     return {
       amap: {
@@ -97,10 +97,10 @@ function buildTencentJsApiUrl() {
     return "";
   }
   const params = new URLSearchParams({
-    v: "2.exp",
+    v: "1.exp",
     key: cfg.jsApiKey
   });
-  return `https://map.qq.com/api/js?${params.toString()}`;
+  return `https://map.qq.com/api/gljs?${params.toString()}`;
 }
 
 async function requestAmap(url) {
