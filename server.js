@@ -153,6 +153,126 @@ async function requestTencent(url) {
   return data;
 }
 
+async function requestOsmReverseGeocode(lat, lng) {
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    lat: String(lat),
+    lon: String(lng),
+    addressdetails: "1"
+  });
+  const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+    headers: {
+      "User-Agent": "MotoFlow/1.0 (reverse-geocode-fallback)"
+    }
+  });
+  const text = await resp.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!resp.ok || !data) {
+    throw new Error(`OSM reverse geocode failed: ${resp.status}`);
+  }
+  return data;
+}
+
+function parseLatLngText(locationText) {
+  const [latText = "", lngText = ""] = String(locationText || "").split(",");
+  const lat = Number(latText.trim());
+  const lng = Number(lngText.trim());
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+function toTencentLikeResultFromOsm(osmData, latLng) {
+  const address = osmData?.display_name || "当前位置";
+  const addr = osmData?.address || {};
+  const city = addr.city || addr.town || addr.village || addr.state || "";
+  const district = addr.city_district || addr.suburb || addr.county || "";
+  const road = addr.road || "";
+  const houseNumber = addr.house_number || "";
+  return {
+    status: 0,
+    message: "query ok",
+    request_id: `fallback-${Date.now()}`,
+    result: {
+      address,
+      formatted_addresses: {
+        recommend: address,
+        rough: address,
+        standard_address: address
+      },
+      address_component: {
+        nation: addr.country || "",
+        province: addr.state || "",
+        city,
+        district,
+        street: road,
+        street_number: houseNumber
+      },
+      ad_info: {
+        nation_code: "",
+        adcode: "",
+        city_code: "",
+        name: city || district || (addr.state || ""),
+        location: {
+          lat: latLng.lat,
+          lng: latLng.lng
+        }
+      },
+      location: {
+        lat: latLng.lat,
+        lng: latLng.lng
+      },
+      poi_count: 0,
+      pois: []
+    }
+  };
+}
+
+function toTencentLikeResultFromCoords(latLng) {
+  const textAddress = `当前位置(${latLng.lat.toFixed(6)}, ${latLng.lng.toFixed(6)})`;
+  return {
+    status: 0,
+    message: "query ok",
+    request_id: `fallback-coords-${Date.now()}`,
+    result: {
+      address: textAddress,
+      formatted_addresses: {
+        recommend: textAddress,
+        rough: textAddress,
+        standard_address: textAddress
+      },
+      address_component: {
+        nation: "",
+        province: "",
+        city: "",
+        district: "",
+        street: "",
+        street_number: ""
+      },
+      ad_info: {
+        nation_code: "",
+        adcode: "",
+        city_code: "",
+        name: "当前位置",
+        location: {
+          lat: latLng.lat,
+          lng: latLng.lng
+        }
+      },
+      location: {
+        lat: latLng.lat,
+        lng: latLng.lng
+      },
+      poi_count: 0,
+      pois: []
+    }
+  };
+}
+
 async function handleApi(req, res, cleanUrl) {
   if (req.method === "GET" && cleanUrl === "/api/health") {
     return send(res, 200, JSON.stringify({ ok: true, ts: Date.now() }), "application/json; charset=utf-8");
@@ -273,7 +393,40 @@ async function handleApi(req, res, cleanUrl) {
       const data = await requestTencent(apiUrl);
       return send(res, 200, JSON.stringify({ ok: true, data }), "application/json; charset=utf-8");
     } catch (error) {
-      return send(res, 502, JSON.stringify({ ok: false, message: error.message, url: apiUrl }), "application/json; charset=utf-8");
+      const latLng = parseLatLngText(location);
+      if (!latLng) {
+        return send(
+          res,
+          400,
+          JSON.stringify({ ok: false, message: "location 参数格式错误，应为 lat,lng", url: apiUrl }),
+          "application/json; charset=utf-8"
+        );
+      }
+      try {
+        const osmData = await requestOsmReverseGeocode(latLng.lat, latLng.lng);
+        const fallbackData = toTencentLikeResultFromOsm(osmData, latLng);
+        return send(
+          res,
+          200,
+          JSON.stringify({ ok: true, data: fallbackData, fallback: "osm", primaryError: error.message, url: apiUrl }),
+          "application/json; charset=utf-8"
+        );
+      } catch (fallbackError) {
+        const coordsFallbackData = toTencentLikeResultFromCoords(latLng);
+        return send(
+          res,
+          200,
+          JSON.stringify({
+            ok: true,
+            data: coordsFallbackData,
+            fallback: "coords",
+            primaryError: error.message,
+            fallbackError: fallbackError.message,
+            url: apiUrl
+          }),
+          "application/json; charset=utf-8"
+        );
+      }
     }
   }
 

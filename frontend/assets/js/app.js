@@ -101,7 +101,12 @@ const mapRuntime = {
   sdkUrl: "",
   map: null,
   mapContainerId: "",
-  renderToken: 0
+  mapContainerEl: null,
+  renderToken: 0,
+  pickupSyncTimer: null,
+  pickupSyncPending: null,
+  suppressCenterSyncUntil: 0,
+  listenersBound: false
 };
 
 const DEMO_TENCENT_JS_KEY = "CSIBZ-OXWY3-MD23Q-RVESB-5CESS-YDBTD";
@@ -111,12 +116,12 @@ let DEBUG_MODE = (() => {
   try {
     const stored = localStorage.getItem(DEBUG_MODE_KEY);
     if (stored === null) {
-      localStorage.setItem(DEBUG_MODE_KEY, "1");
-      return true;
+      localStorage.setItem(DEBUG_MODE_KEY, "0");
+      return false;
     }
     return stored === "1";
   } catch {
-    return true;
+    return false;
   }
 })();
 
@@ -212,15 +217,117 @@ function getMapScene() {
   const tab = roleTabs[state.role][state.index]?.id;
   if (state.role === "passenger" && state.order.pickupLocation) {
     const pickup = state.order.pickupLocation;
-    return { lat: pickup.lat, lng: pickup.lng, zoom: 16, pitch: 26, rotation: 12 };
+    return { lat: pickup.lat, lng: pickup.lng, zoom: 16, pitch: 0, rotation: 0 };
+  }
+  if (state.role === "passenger" && tab === "home") {
+    return { lat: 22.543096, lng: 114.057865, zoom: 16, pitch: 0, rotation: 0 };
   }
   if (state.role === "passenger" && tab === "trip") {
-    return { lat: 22.543096, lng: 114.057865, zoom: 13, pitch: 28, rotation: 8 };
+    return { lat: 22.543096, lng: 114.057865, zoom: 15, pitch: 0, rotation: 0 };
   }
   if (state.role === "driver") {
-    return { lat: 22.552023, lng: 114.093632, zoom: 12, pitch: 35, rotation: 15 };
+    return { lat: 22.552023, lng: 114.093632, zoom: 14, pitch: 0, rotation: 0 };
   }
-  return { lat: 22.543096, lng: 114.057865, zoom: 14, pitch: 30, rotation: 20 };
+  return { lat: 22.543096, lng: 114.057865, zoom: 15, pitch: 0, rotation: 0 };
+}
+
+function isPassengerHomeActive() {
+  const tab = roleTabs[state.role][state.index]?.id;
+  return state.role === "passenger" && tab === "home";
+}
+
+function normalizeLatLng(lat, lng) {
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+  if (!Number.isFinite(nLat) || !Number.isFinite(nLng)) return null;
+  return {
+    lat: Number(nLat.toFixed(6)),
+    lng: Number(nLng.toFixed(6))
+  };
+}
+
+function extractLatLng(point) {
+  if (!point) return null;
+  if (typeof point.getLat === "function" && typeof point.getLng === "function") {
+    return normalizeLatLng(point.getLat(), point.getLng());
+  }
+  if (typeof point.lat !== "undefined" && typeof point.lng !== "undefined") {
+    return normalizeLatLng(point.lat, point.lng);
+  }
+  return null;
+}
+
+function setMapCenterLocation(location, zoom) {
+  if (!mapRuntime.map || !window.TMap) return;
+  const center = new TMap.LatLng(location.lat, location.lng);
+  mapRuntime.suppressCenterSyncUntil = Date.now() + 500;
+  mapRuntime.map.setCenter(center);
+  if (typeof zoom === "number" && typeof mapRuntime.map.setZoom === "function") {
+    mapRuntime.map.setZoom(zoom);
+  }
+}
+
+async function syncPickupWithMapCenter() {
+  if (!mapRuntime.map) return;
+  if (!isPassengerHomeActive()) return;
+  if (Date.now() < mapRuntime.suppressCenterSyncUntil) return;
+
+  const center = extractLatLng(mapRuntime.map.getCenter?.());
+  if (!center) return;
+
+  const prev = state.order.pickupLocation;
+  if (prev && Math.abs(prev.lat - center.lat) < 0.00001 && Math.abs(prev.lng - center.lng) < 0.00001) {
+    return;
+  }
+
+  try {
+    logDebug(`地图选点中心: ${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`);
+    mapRuntime.pickupSyncPending = `${center.lat},${center.lng}`;
+    const pickup = await fetchPickupPointFromLocation(center);
+    if (mapRuntime.pickupSyncPending !== `${center.lat},${center.lng}`) return;
+
+    state.origin.status = "ready";
+    state.origin.error = "";
+    state.origin.address = pickup.address || "当前位置";
+    state.origin.location = center;
+    state.origin.updatedAt = new Date().toISOString();
+    state.origin.nearby = pickup.pois?.slice(0, 6) || state.origin.nearby;
+    state.order.from = state.origin.address;
+    state.order.pickupLocation = center;
+    state.order.pickupRaw = pickup.raw;
+    logDebug("地图中心点逆地址完成");
+  } catch (error) {
+    if (mapRuntime.pickupSyncPending !== `${center.lat},${center.lng}`) return;
+    state.origin.status = "ready";
+    state.origin.error = error?.message || "地图选点解析失败";
+    state.origin.address = `当前定位：${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`;
+    state.origin.location = center;
+    state.origin.updatedAt = new Date().toISOString();
+    state.order.from = state.origin.address;
+    state.order.pickupLocation = center;
+    logDebug(`地图中心点逆地址降级: ${state.origin.error}`);
+  } finally {
+    if (mapRuntime.pickupSyncPending === `${center.lat},${center.lng}`) {
+      mapRuntime.pickupSyncPending = null;
+    }
+    render();
+  }
+}
+
+function schedulePickupCenterSync() {
+  if (!isPassengerHomeActive()) return;
+  if (Date.now() < mapRuntime.suppressCenterSyncUntil) return;
+  clearTimeout(mapRuntime.pickupSyncTimer);
+  mapRuntime.pickupSyncTimer = setTimeout(() => {
+    syncPickupWithMapCenter();
+  }, 300);
+}
+
+function bindMainMapListeners() {
+  if (!mapRuntime.map || mapRuntime.listenersBound || !window.TMap) return;
+  mapRuntime.listenersBound = true;
+  mapRuntime.map.on("dragend", schedulePickupCenterSync);
+  mapRuntime.map.on("zoomend", schedulePickupCenterSync);
 }
 
 function getCurrentLocation() {
@@ -231,22 +338,41 @@ function getCurrentLocation() {
       return;
     }
 
-    logDebug("请求浏览器定位权限");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        logDebug(`定位成功: ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`);
-        resolve({
-          lat: Number(position.coords.latitude),
-          lng: Number(position.coords.longitude),
-          accuracy: Number(position.coords.accuracy || 0)
-        });
-      },
-      (error) => {
-        logDebug(`定位失败: ${error.message || error.code}`);
-        reject(error);
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
-    );
+    const normalizeLocation = (position) => ({
+      lat: Number(position.coords.latitude),
+      lng: Number(position.coords.longitude),
+      accuracy: Number(position.coords.accuracy || 0)
+    });
+
+    const requestLocation = (options, stageLabel) => new Promise((stageResolve, stageReject) => {
+      logDebug(`请求浏览器定位权限${stageLabel}`);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const normalized = normalizeLocation(position);
+          logDebug(`定位成功${stageLabel}: ${normalized.lat.toFixed(6)}, ${normalized.lng.toFixed(6)}`);
+          stageResolve(normalized);
+        },
+        (error) => {
+          logDebug(`定位失败${stageLabel}: ${error.message || error.code}`);
+          stageReject(error);
+        },
+        options
+      );
+    });
+
+    requestLocation({ enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }, "(高精度)")
+      .then(resolve)
+      .catch((error) => {
+        const timedOut = error?.code === 3 || /timeout/i.test(error?.message || "");
+        if (!timedOut) {
+          reject(error);
+          return;
+        }
+        logDebug("高精度定位超时，切换到低精度快速定位");
+        requestLocation({ enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 }, "(低精度)")
+          .then(resolve)
+          .catch(reject);
+      });
   });
 }
 
@@ -388,13 +514,7 @@ async function relocateToCurrentAddress() {
     location = await getCurrentLocation();
     state.order.currentLocation = location;
     state.order.pickupLocation = location;
-    if (mapRuntime.map && window.TMap) {
-      const center = new TMap.LatLng(location.lat, location.lng);
-      mapRuntime.map.setCenter(center);
-      if (typeof mapRuntime.map.setZoom === "function") {
-        mapRuntime.map.setZoom(16);
-      }
-    }
+    setMapCenterLocation(location, 16);
     const pickup = await fetchPickupPointFromLocation(location);
     state.origin.status = "ready";
     state.origin.address = pickup.address || "当前位置";
@@ -436,6 +556,8 @@ async function mountMainMap(token) {
     }
     mapRuntime.map = null;
     mapRuntime.mapContainerId = "";
+    mapRuntime.mapContainerEl = null;
+    mapRuntime.listenersBound = false;
     return;
   }
 
@@ -457,11 +579,16 @@ async function mountMainMap(token) {
   const center = new TMap.LatLng(scene.lat, scene.lng);
 
   try {
-    if (mapRuntime.map && mapRuntime.mapContainerId !== canvas.id) {
+    const containerChanged =
+      mapRuntime.mapContainerId !== canvas.id ||
+      mapRuntime.mapContainerEl !== canvas;
+
+    if (mapRuntime.map && containerChanged) {
       if (typeof mapRuntime.map.destroy === "function") {
         mapRuntime.map.destroy();
       }
       mapRuntime.map = null;
+      mapRuntime.listenersBound = false;
     }
 
     if (!mapRuntime.map) {
@@ -472,11 +599,25 @@ async function mountMainMap(token) {
         rotation: scene.rotation
       });
       mapRuntime.mapContainerId = canvas.id;
+      mapRuntime.mapContainerEl = canvas;
+      mapRuntime.suppressCenterSyncUntil = Date.now() + 500;
+      bindMainMapListeners();
     } else {
-      mapRuntime.map.setCenter(center);
+      setMapCenterLocation({ lat: scene.lat, lng: scene.lng });
       if (typeof mapRuntime.map.setZoom === "function") {
         mapRuntime.map.setZoom(scene.zoom);
       }
+      if (typeof mapRuntime.map.setPitch === "function") {
+        mapRuntime.map.setPitch(scene.pitch);
+      }
+      if (typeof mapRuntime.map.setRotation === "function") {
+        mapRuntime.map.setRotation(scene.rotation);
+      }
+      bindMainMapListeners();
+    }
+
+    if (typeof mapRuntime.map.resize === "function") {
+      mapRuntime.map.resize();
     }
   } catch (error) {
     showMapMessage(canvas, error.message || "地图渲染失败");
@@ -503,10 +644,19 @@ function badge(status) {
   return `<span class="badge ${x[1]}">${x[0]}</span>`;
 }
 
-function mapBox() {
+function mapBox(options = {}) {
+  const pin = options.showCenterPin
+    ? `
+      <div class="map-center-pin" aria-hidden="true">
+        <span class="map-center-pin-head"></span>
+        <span class="map-center-pin-stem"></span>
+      </div>
+    `
+    : "";
   return `
     <div class="map-shell">
       <div class="map-canvas js-main-map"></div>
+      ${pin}
     </div>
   `;
 }
@@ -718,7 +868,7 @@ function passengerScreen(tab) {
     return `
       <section class="ride-home">
         <div class="ride-map-stage">
-          ${mapBox()}
+          ${mapBox({ showCenterPin: true })}
           <button class="debug-switch" aria-label="切换调试模式" title="切换调试模式" onclick="toggleDebugMode()">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94a7.43 7.43 0 0 0 .05-.94 7.43 7.43 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 14.86 1h-3.72a.5.5 0 0 0-.49.42l-.36 2.54c-.57.22-1.12.53-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L3.74 7.48a.5.5 0 0 0 .12.64l2.03 1.58a7.43 7.43 0 0 0-.05.94c0 .32.02.63.05.94L3.86 13.16a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.61.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.72c.24 0 .45-.18.49-.42l.36-2.54c.57-.22 1.12-.53 1.63-.94l2.39.96c.22.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/></svg>
             <span class="debug-switch-text">${DEBUG_MODE ? "调试" : "用户"}</span>
