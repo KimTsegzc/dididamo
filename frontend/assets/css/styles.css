@@ -31,20 +31,20 @@ body {
   max-width: 1080px;
   margin: 0 auto;
   min-height: 100vh;
-  padding: 14px;
+  padding: 0;
   display: grid;
-  gap: 14px;
+  gap: 0;
   grid-template-columns: 1fr;
 }
 
 .phone-shell {
   width: min(420px, 100%);
   margin: 0 auto;
-  min-height: calc(100vh - 28px);
-  border-radius: 18px;
-  border: 1px solid #d9d9d9;
+  min-height: 100vh;
+  border-radius: 0;
+  border: none;
   background: #fff;
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
   overflow: hidden;
   display: grid;
   grid-template-rows: auto 1fr auto;
@@ -177,6 +177,7 @@ body {
 .map-shell .logo-text,
 .map-shell a[href*="map.qq.com"],
 .map-shell img[src*="logo_def.png"],
+.map-shell .tmap-zoom-control,
 .map-shell .rotate-circle,
 .map-shell .compass-circle-background,
 .map-shell .compass-circle,
@@ -291,30 +292,59 @@ input, select {
   top: 10px;
   left: 10px;
   z-index: 5;
-  border: 1px solid rgba(31, 31, 31, 0.08);
-  border-radius: 999px;
+  border: none;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.92);
   color: #6f6f6f;
-  height: 34px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 9px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  gap: 8px;
+  padding: 0 14px 0 12px;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.10);
 }
 
 .debug-switch svg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   fill: currentColor;
   flex: 0 0 auto;
 }
 
 .debug-switch-text {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
+}
+
+.locate-current-btn {
+  position: absolute;
+  right: 14px;
+  bottom: 210px;
+  z-index: 5;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1f1f1f;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.10);
+  display: inline-grid;
+  place-items: center;
+}
+
+.locate-current-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+@media (max-width: 420px) {
+  .locate-current-btn {
+    right: 12px;
+    bottom: 198px;
+  }
 }
 
 .ride-map-stage .map-shell {
@@ -469,6 +499,24 @@ input, select {
   font-size: 14px;
   padding: 5px 2px 6px;
   line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.shortcut-icon {
+  width: 18px;
+  height: 18px;
+  color: #262626;
+  display: inline-grid;
+  place-items: center;
+}
+
+.shortcut-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 .ride-location-hint {

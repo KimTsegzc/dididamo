@@ -141,6 +141,14 @@ function logDebug(message) {
   state.debugLogs = state.debugLogs.slice(0, 8);
 }
 
+function shortcutIconSvg(type) {
+  const icons = {
+    reserve: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7a1 1 0 0 1 1 1v3.38l2.24 1.3a1 1 0 1 1-1 1.72l-2.74-1.58A1 1 0 0 1 11 13V8a1 1 0 0 1 1-1Zm0-5a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z"/></svg>',
+    helper: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm-6 15c0-2.76 2.69-5 6-5s6 2.24 6 5v1H6v-1Zm11-8a1 1 0 0 1 1 1v1h1a1 1 0 1 1 0 2h-1v1a1 1 0 1 1-2 0v-1h-1a1 1 0 1 1 0-2h1v-1a1 1 0 0 1 1-1Z"/></svg>'
+  };
+  return icons[type] || "";
+}
+
 function toggleDebugMode() {
   DEBUG_MODE = !DEBUG_MODE;
   try {
@@ -234,7 +242,12 @@ function getCurrentLocation() {
 
 async function fetchPickupPointFromLocation(location) {
   logDebug("调用腾讯逆地址解析");
-  const query = new URLSearchParams({ location: `${location.lng},${location.lat}`, get_poi: "1" });
+  const query = new URLSearchParams({
+    location: `${location.lat},${location.lng}`,
+    get_poi: "1",
+    radius: "1200",
+    poi_options: "policy=3;orderby=_distance;address_format=short"
+  });
   const resp = await fetch(`/api/tencent/geo/regeo?${query.toString()}`);
   if (!resp.ok) {
     let detail = "逆地址解析失败";
@@ -248,13 +261,20 @@ async function fetchPickupPointFromLocation(location) {
   }
   const data = await resp.json();
   const result = data?.data?.result || {};
-  const address = result?.address || result?.formatted_addresses?.recommend || result?.formatted_addresses?.rough || "当前位置";
-  const poi = result?.address_component?.district ? `${result.address_component.district}${result.address_component.street || ""}` : "";
+  const address = result?.formatted_addresses?.recommend || result?.formatted_addresses?.standard_address || result?.address || result?.formatted_addresses?.rough || "当前位置";
+  const pois = Array.isArray(result?.pois) ? result.pois.map((item) => ({
+    title: item.title || "附近上车点",
+    address: item.address || item._dir_desc || "",
+    distance: typeof item._distance === "number" ? `${item._distance}m` : "",
+    location: item.location || null,
+    category: item.category || ""
+  })) : [];
   logDebug(`逆地址完成: ${address}`);
   return {
-    address: poi ? `${address}` : address,
+    address,
     location,
-    raw: result
+    raw: result,
+    pois
   };
 }
 
@@ -297,34 +317,91 @@ async function fetchNearbyPickupPois(location) {
 }
 
 async function initPassengerPickup() {
+  let location = null;
   try {
     state.origin.status = "locating";
     state.origin.error = "";
     logDebug("初始化上车点开始");
-    const location = await getCurrentLocation();
+    location = await getCurrentLocation();
+    state.order.currentLocation = location;
+    state.order.pickupLocation = location;
     const pickup = await fetchPickupPointFromLocation(location);
-    const nearby = await fetchNearbyPickupPois(location);
+    const nearby = pickup.pois?.length ? pickup.pois.slice(0, 6) : await fetchNearbyPickupPois(location);
     state.origin.status = "ready";
     state.origin.address = pickup.address || state.origin.address;
     state.origin.location = pickup.location;
     state.origin.nearby = nearby;
     state.origin.updatedAt = new Date().toISOString();
     state.order.from = pickup.address || state.order.from;
-    state.order.currentLocation = location;
     state.order.pickupLocation = pickup.location;
     state.order.pickupRaw = pickup.raw;
     logDebug("初始化上车点完成");
     render();
   } catch (error) {
-    state.origin.status = "fallback";
     state.origin.error = error?.message || "定位失败";
-    state.order.currentLocation = null;
-    logDebug(`初始化上车点失败: ${state.origin.error}`);
+    if (location) {
+      state.origin.status = "ready";
+      state.origin.address = "当前位置";
+      state.origin.location = location;
+      state.origin.updatedAt = new Date().toISOString();
+      state.order.from = "当前位置";
+      state.order.currentLocation = location;
+      state.order.pickupLocation = location;
+      logDebug(`逆地址不可用，降级使用坐标初始化: ${state.origin.error}`);
+    } else {
+      state.origin.status = "fallback";
+      state.order.currentLocation = null;
+      logDebug(`初始化上车点失败: ${state.origin.error}`);
+    }
+    render();
   }
 }
 
 function retryPickupInit() {
   initPassengerPickup();
+}
+
+async function relocateToCurrentAddress() {
+  let location = null;
+  try {
+    logDebug("手动触发当前位置校准");
+    location = await getCurrentLocation();
+    state.order.currentLocation = location;
+    state.order.pickupLocation = location;
+    if (mapRuntime.map && window.TMap) {
+      const center = new TMap.LatLng(location.lat, location.lng);
+      mapRuntime.map.setCenter(center);
+      if (typeof mapRuntime.map.setZoom === "function") {
+        mapRuntime.map.setZoom(16);
+      }
+    }
+    const pickup = await fetchPickupPointFromLocation(location);
+    state.origin.status = "ready";
+    state.origin.address = pickup.address || "当前位置";
+    state.origin.location = location;
+    state.origin.updatedAt = new Date().toISOString();
+    state.origin.nearby = pickup.pois?.slice(0, 6) || state.origin.nearby;
+    state.order.from = pickup.address || "当前位置";
+    state.order.pickupLocation = location;
+    state.order.pickupRaw = pickup.raw;
+    logDebug("当前位置校准完成并已录入起点");
+  } catch (error) {
+    const message = error?.message || "当前位置校准失败";
+    if (location) {
+      state.origin.status = "ready";
+      state.origin.address = "当前位置";
+      state.origin.location = location;
+      state.origin.updatedAt = new Date().toISOString();
+      state.order.from = "当前位置";
+      state.order.pickupLocation = location;
+      logDebug(`校准已完成，逆地址降级: ${message}`);
+    } else {
+      state.origin.status = "fallback";
+      state.origin.error = message;
+      logDebug(`当前位置校准失败: ${message}`);
+    }
+  }
+  render();
 }
 
 function showMapMessage(canvas, message) {
@@ -626,6 +703,9 @@ function passengerScreen(tab) {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94a7.43 7.43 0 0 0 .05-.94 7.43 7.43 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 14.86 1h-3.72a.5.5 0 0 0-.49.42l-.36 2.54c-.57.22-1.12.53-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L3.74 7.48a.5.5 0 0 0 .12.64l2.03 1.58a7.43 7.43 0 0 0-.05.94c0 .32.02.63.05.94L3.86 13.16a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.61.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.72c.24 0 .45-.18.49-.42l.36-2.54c.57-.22 1.12-.53 1.63-.94l2.39.96c.22.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/></svg>
             <span class="debug-switch-text">${DEBUG_MODE ? "调试" : "用户"}</span>
           </button>
+          <button class="locate-current-btn" aria-label="定位到当前地址" title="定位到当前地址" onclick="relocateToCurrentAddress()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v1.06a7 7 0 0 1 5.94 5.94H20a1 1 0 1 1 0 2h-1.06A7 7 0 0 1 13 18.94V20a1 1 0 1 1-2 0v-1.06A7 7 0 0 1 5.06 13H4a1 1 0 1 1 0-2h1.06A7 7 0 0 1 11 5.06V4a1 1 0 0 1 1-1Zm0 4a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6Z"/></svg>
+          </button>
         </div>
 
         <div class="ride-dock">
@@ -641,8 +721,8 @@ function passengerScreen(tab) {
           </button>
 
           <div class="ride-shortcuts">
-            <button class="shortcut">预约</button>
-            <button class="shortcut">帮人叫车</button>
+            <button class="shortcut"><span class="shortcut-icon">${shortcutIconSvg("reserve")}</span><span>预约</span></button>
+            <button class="shortcut"><span class="shortcut-icon">${shortcutIconSvg("helper")}</span><span>帮人叫车</span></button>
           </div>
 
           ${DEBUG_MODE ? `

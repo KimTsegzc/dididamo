@@ -4,6 +4,7 @@ const path = require("path");
 
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || "0.0.0.0";
+const DEFAULT_TENCENT_KEY = "CSIBZ-OXWY3-MD23Q-RVESB-5CESS-YDBTD";
 const root = __dirname;
 const frontendRoot = path.join(root, "frontend");
 const tcMapApiRoot = path.join(root, "TCMapApi");
@@ -36,8 +37,8 @@ function readRuntimeConfig() {
         securityJsCode: String(data?.amap?.securityJsCode || "")
       },
       tencent: {
-        jsApiKey: String(data?.tencent?.jsApiKey || ""),
-        webServiceKey: String(data?.tencent?.webServiceKey || ""),
+        jsApiKey: String(data?.tencent?.jsApiKey || DEFAULT_TENCENT_KEY),
+        webServiceKey: String(data?.tencent?.webServiceKey || DEFAULT_TENCENT_KEY),
         appKey: String(data?.tencent?.appKey || ""),
         securityJsCode: String(data?.tencent?.securityJsCode || "")
       }
@@ -45,7 +46,7 @@ function readRuntimeConfig() {
   } catch {
     return {
       amap: { jsApiKey: "", webServiceKey: "", securityJsCode: "" },
-      tencent: { jsApiKey: "", webServiceKey: "", appKey: "", securityJsCode: "" }
+      tencent: { jsApiKey: DEFAULT_TENCENT_KEY, webServiceKey: DEFAULT_TENCENT_KEY, appKey: "", securityJsCode: "" }
     };
   }
 }
@@ -140,6 +141,12 @@ async function requestTencent(url) {
     const message = (data && data.message) || (data && data.msg) || `Tencent request failed: ${resp.status}`;
     const err = new Error(message);
     err.status = resp.status;
+    err.data = data;
+    throw err;
+  }
+  if (data && typeof data.status === "number" && data.status !== 0) {
+    const err = new Error(data.message || `Tencent API status ${data.status}`);
+    err.status = 502;
     err.data = data;
     throw err;
   }
@@ -255,11 +262,13 @@ async function handleApi(req, res, cleanUrl) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const location = url.searchParams.get("location") || "";
     const get_poi = url.searchParams.get("get_poi") || "1";
+    const radius = url.searchParams.get("radius") || "1200";
+    const poi_options = url.searchParams.get("poi_options") || "policy=3;orderby=_distance;address_format=short";
     const apiKey = getTencentServiceKey();
     if (!apiKey) {
       return send(res, 400, JSON.stringify({ ok: false, message: "tencent.webServiceKey 未配置" }), "application/json; charset=utf-8");
     }
-    const apiUrl = `https://apis.map.qq.com/ws/geocoder/v1/?${new URLSearchParams({ key: apiKey, location, get_poi }).toString()}`;
+    const apiUrl = `https://apis.map.qq.com/ws/geocoder/v1/?${new URLSearchParams({ key: apiKey, location, get_poi, radius, poi_options }).toString()}`;
     try {
       const data = await requestTencent(apiUrl);
       return send(res, 200, JSON.stringify({ ok: true, data }), "application/json; charset=utf-8");
