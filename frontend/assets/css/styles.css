@@ -121,6 +121,22 @@ body {
   fill: currentColor;
 }
 
+.tab-icon-home-mask {
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+  background: linear-gradient(160deg, #fff7dd 0%, #ffe49a 45%, #ffd166 100%);
+  -webkit-mask-image: url('/assets/img/home-icon.png');
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  mask-image: url('/assets/img/home-icon.png');
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  filter: drop-shadow(0 1px 0 rgba(72, 48, 0, 0.18));
+}
+
 .tab-text {
   line-height: 1;
 }
@@ -142,6 +158,13 @@ body {
 .tab.home-tab .tab-icon svg {
   width: 28px;
   height: 28px;
+}
+
+.tab.home-tab .tab-icon .tab-icon-home-mask {
+  width: 30px;
+  height: 30px;
+  background: #1f1f1f;
+  filter: none;
 }
 
 .tab.home-tab .tab-text {
@@ -670,7 +693,7 @@ input, select {
   position: absolute;
   inset: 0;
   z-index: 22;
-  background: #f6f6f6;
+  background: #efefef;
   display: grid;
   grid-template-rows: auto auto auto 1fr;
   padding: 10px 0 12px;
@@ -679,42 +702,55 @@ input, select {
 
 .dest-topbar {
   display: grid;
-  grid-template-columns: 36px 1fr auto;
+  grid-template-columns: 40px 1fr auto;
   align-items: center;
   gap: 10px;
-  padding: 4px 18px 8px;
+  padding: 8px 16px 10px;
 }
 
 .dest-back {
   border: none;
   background: transparent;
-  font-size: 34px;
+  font-size: 38px;
   line-height: 1;
-  color: #222;
-  background: linear-gradient(180deg, #ffd34a 0%, #ffbe07 100%);
-  box-shadow: 0 6px 14px rgba(217, 148, 0, 0.34);
-.dest-brand {
-  text-align: center;
-  font-size: 22px;
-  font-weight: 700;
-  color: #191919;
+  color: #1f1f1f;
+  padding: 0;
 }
 
-.dest-tools {
-  display: flex;
-  background: #fff8e2;
-  gap: 10px;
+.dest-brand {
+  text-align: center;
+  font-size: 40px;
+  font-weight: 700;
+  color: #161616;
+  letter-spacing: 0.03em;
+}
+
+.dest-tool-cluster {
+  display: inline-flex;
+  align-items: center;
+  background: #f3f3f3;
+  border: 1px solid #dddddd;
+  border-radius: 999px;
+  padding: 0 4px;
+  min-height: 40px;
 }
 
 .dest-tool {
-  min-width: 42px;
-  height: 42px;
-  border: 1px solid #ececec;
-  background: #f1b800;
-  background: #fff;
+  min-width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
   color: #1f1f1f;
-  font-size: 20px;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+  font-size: 16px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+}
+
+.dest-tool-sep {
+  width: 1px;
+  height: 18px;
+  background: #d7d7d7;
 }
 
 .dest-input-wrap {
@@ -723,18 +759,17 @@ input, select {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 10px;
-  background: #efefef;
-  border-radius: 12px;
-  padding: 14px 14px;
-  margin-left: 18px;
-  margin-right: 18px;
+  background: #e8e8e8;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin: 0 16px;
 }
 
 .dest-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #ff8c4b;
+  background: #f56c23;
 }
 
 .origin-dot {
@@ -749,26 +784,27 @@ input, select {
   background: transparent;
   margin: 0;
   padding: 0;
-  font-size: 18px;
-  color: #707070;
+  font-size: 20px;
+  color: #6f6f6f;
+  font-weight: 600;
 }
 
 .dest-pass {
   border: 1px solid #dcdcdc;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
-  padding: 12px 14px;
-  font-size: 14px;
+  padding: 10px 12px;
+  font-size: 13px;
   color: #222;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .dest-quick {
-  margin-top: 14px;
+  margin-top: 12px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  padding: 0 18px;
+  gap: 10px;
+  padding: 0 16px;
 }
 
 .dest-quick.origin-quick {
@@ -776,62 +812,55 @@ input, select {
 }
 
 .quick-item {
-  border: none;
-  border-radius: 14px;
-  background: #fff;
-  color: #444;
-  font-size: 15px;
-  padding: 14px 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e4e4e4;
+  border-radius: 12px;
+  background: #f7f7f7;
+  color: #3f3f3f;
+  font-size: 14px;
+  padding: 10px 8px;
 }
 
 .dest-list-stack {
   display: grid;
-  gap: 14px;
-  padding: 14px 0 0;
+  gap: 10px;
+  padding: 12px 0 0;
 }
 
 .dest-list-card {
-  border: 1px solid #f0e1d6;
-  border-radius: 18px;
-  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: #f6f6f6;
   overflow: hidden;
-  margin: 0 18px;
+  margin: 0 16px;
 }
 
 .dest-list-title {
-  background: #fff5ef;
-  color: #d7834c;
+  background: #f6f6f6;
+  color: #3f3f3f;
   font-weight: 700;
-  font-size: 15px;
-  padding: 14px 16px;
+  font-size: 18px;
+  padding: 12px 14px 4px;
 }
 
 .dest-list-title.city-title {
-  background: #fff;
-  color: #2f2f2f;
+  background: #f6f6f6;
+  color: #3f3f3f;
 }
 
 .dest-item {
   width: 100%;
   border: none;
-  border-top: 1px solid #f3f3f3;
-  background: #fff;
+  border-top: 1px solid #ececec;
+  background: #f6f6f6;
   text-align: left;
-  padding: 14px 16px;
+  padding: 12px 14px;
 }
 
-.rich-dest-item {
+.dest-item-simple {
   display: grid;
-  grid-template-columns: 28px 1fr auto;
-  gap: 12px;
-  align-items: start;
-}
-
-.dest-item-icon {
-  font-size: 20px;
-  color: #a1a1a1;
-  line-height: 1.1;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .dest-item-copy {
@@ -839,34 +868,36 @@ input, select {
 }
 
 .dest-main {
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
-  color: #222;
+  color: #2a2a2a;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .dest-sub {
-  margin-top: 4px;
-  color: #808080;
-  font-size: 13px;
+  margin-top: 2px;
+  color: #777;
+  font-size: 16px;
   line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dest-item-meta {
-  display: grid;
-  justify-items: end;
-  gap: 8px;
-  color: #8b8b8b;
-  font-size: 12px;
+  color: #6f6f6f;
+  font-size: 16px;
+  min-width: 64px;
+  text-align: right;
 }
 
 .dest-tag {
   display: inline-block;
   border-radius: 8px;
-  background: #eef4ff;
-  color: #6b86c6;
+  background: #fff3de;
+  color: #b7771f;
   font-size: 11px;
   padding: 3px 6px;
 }

@@ -91,7 +91,7 @@ const tabIconSvg = {
   driver: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 14c5 0 9 2.2 9 5v1H3v-1c0-2.8 4-5 9-5z"/></svg>',
   ticket: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7zm6 2h4v2h-4V9zm0 4h4v2h-4v-2z"/></svg>',
   me: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 12c4.4 0 8 2.2 8 5v1H4v-1c0-2.8 3.6-5 8-5z"/></svg>',
-  moto: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 17a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 3.28 2.27h2.34l1.48-2.27H11V8h4.9a1 1 0 0 1 .84 1.55l-1.9 2.95h1.66A3.5 3.5 0 1 1 16.5 17h-10zM6.5 12a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm10 0a1.5 1.5 0 1 0 .001 3.001A1.5 1.5 0 0 0 16.5 12z"/></svg>'
+  moto: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.1 16.3a2.6 2.6 0 1 1 0 5.2 2.6 2.6 0 0 1 0-5.2Zm9.9 0a2.6 2.6 0 1 1 0 5.2 2.6 2.6 0 0 1 0-5.2ZM7.1 17.8c-.64 0-1.17.48-1.25 1.1h1.82l2.98-4.36a.8.8 0 0 0-.26-1.14l-1.55-.92a.8.8 0 1 1 .82-1.37l1.35.81.95-1.4a2.5 2.5 0 0 1 2.05-1.08h1.94c.89 0 1.72.45 2.2 1.2l1.2 1.85a.8.8 0 0 1-.67 1.23h-1.31l.42.73a.8.8 0 0 1-.69 1.2h-2.56l-.6.9h2.21c1.45 0 2.65 1.1 2.81 2.52h-.96a1.26 1.26 0 0 0-2.5 0H8.35a1.26 1.26 0 0 0-1.25-1.1Zm8.26-5.75h2.02l-.46-.71a1.62 1.62 0 0 0-1.36-.75h-1.53c-.54 0-1.05.27-1.35.72l-.74 1.08 1.5.89.64-.95a.8.8 0 0 1 .66-.35Z"/></svg>'
 };
 
 const mapRuntime = {
@@ -107,7 +107,8 @@ const mapRuntime = {
   pickupSyncPending: null,
   suppressCenterSyncUntil: 0,
   listenersBound: false,
-  userAdjustedViewport: false
+  userAdjustedViewport: false,
+  customWheelBound: false
 };
 
 const DEMO_TENCENT_JS_KEY = "CSIBZ-OXWY3-MD23Q-RVESB-5CESS-YDBTD";
@@ -382,11 +383,34 @@ function schedulePickupCenterSync() {
   }, 300);
 }
 
+function onMapWheel(event) {
+  if (!mapRuntime.map || !isPassengerHomeActive()) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (typeof event.stopImmediatePropagation === "function") {
+    event.stopImmediatePropagation();
+  }
+
+  const currentZoom = typeof mapRuntime.map.getZoom === "function" ? mapRuntime.map.getZoom() : 17;
+  const step = event.deltaY > 0 ? -0.8 : 0.8;
+  const nextZoom = Math.max(3, Math.min(20, currentZoom + step));
+  mapRuntime.userAdjustedViewport = true;
+  mapRuntime.suppressCenterSyncUntil = Date.now() + 500;
+  if (typeof mapRuntime.map.setZoom === "function") {
+    mapRuntime.map.setZoom(nextZoom);
+  }
+}
+
+function bindMapWheelZoom(canvas) {
+  if (!canvas || mapRuntime.customWheelBound) return;
+  mapRuntime.customWheelBound = true;
+  canvas.addEventListener("wheel", onMapWheel, { passive: false, capture: true });
+}
+
 function bindMainMapListeners() {
   if (!mapRuntime.map || mapRuntime.listenersBound || !window.TMap) return;
   mapRuntime.listenersBound = true;
   mapRuntime.map.on("dragend", schedulePickupCenterSync);
-  mapRuntime.map.on("zoomend", schedulePickupCenterSync);
 }
 
 function getCurrentLocation() {
@@ -620,6 +644,7 @@ async function mountMainMap(token) {
     mapRuntime.mapContainerEl = null;
     mapRuntime.listenersBound = false;
     mapRuntime.userAdjustedViewport = false;
+    mapRuntime.customWheelBound = false;
     return;
   }
 
@@ -652,6 +677,7 @@ async function mountMainMap(token) {
       mapRuntime.map = null;
       mapRuntime.listenersBound = false;
       mapRuntime.userAdjustedViewport = false;
+      mapRuntime.customWheelBound = false;
     }
 
     if (!mapRuntime.map) {
@@ -665,6 +691,7 @@ async function mountMainMap(token) {
       mapRuntime.mapContainerEl = canvas;
       mapRuntime.suppressCenterSyncUntil = Date.now() + 500;
       bindMainMapListeners();
+      bindMapWheelZoom(canvas);
     } else {
       const keepViewport = isPassengerHomeActive() && mapRuntime.userAdjustedViewport;
       if (!keepViewport) {
@@ -680,6 +707,7 @@ async function mountMainMap(token) {
         }
       }
       bindMainMapListeners();
+      bindMapWheelZoom(canvas);
     }
 
     if (typeof mapRuntime.map.resize === "function") {
@@ -806,17 +834,20 @@ function renderAddressPanel() {
   return `
     <section class="dest-panel" role="dialog" aria-label="地址输入">
       <div class="dest-topbar">
-        <button class="dest-back" onclick="closeDestinationPanel()">‹</button>
+        <button class="dest-back" onclick="closeDestinationPanel()" aria-label="返回">‹</button>
         <div class="dest-brand">摩滴</div>
-        <div class="dest-tools">
+        <div class="dest-tool-cluster" aria-hidden="true">
           <button class="dest-tool">•••</button>
+          <span class="dest-tool-sep"></span>
+          <button class="dest-tool">一</button>
+          <span class="dest-tool-sep"></span>
           <button class="dest-tool">◎</button>
         </div>
       </div>
       <div class="dest-input-wrap didi-panel-input">
         <span class="${dotClass}"></span>
         <input class="dest-input" placeholder="${placeholder}" autofocus />
-        ${isOrigin ? "" : '<button class="dest-pass">+ 途经点</button>'}
+        ${isOrigin ? "" : '<button class="dest-pass">+途经点</button>'}
       </div>
       <div class="dest-quick ${isOrigin ? "origin-quick" : ""}">
         ${quickItems.map((item) => `<button class="quick-item">${item}</button>`).join("")}
@@ -826,15 +857,13 @@ function renderAddressPanel() {
           <section class="dest-list-card ${section.recommended ? "recommended-card" : ""}">
             <div class="dest-list-title ${section.recommended ? "recommended-title" : "city-title"}">${section.name}</div>
             ${section.items.map((item) => `
-              <button class="dest-item rich-dest-item" onclick="chooseDestination('${escapeHtml(item.title).replaceAll("&#39;", "\\'")}')">
-                <div class="dest-item-icon">${renderAddressIcon(item.icon)}</div>
+              <button class="dest-item dest-item-simple" onclick="chooseDestination('${escapeHtml(item.title).replaceAll("&#39;", "\\'")}')">
                 <div class="dest-item-copy">
                   <div class="dest-main">${item.title}${item.tag ? `<span class="dest-tag">${item.tag}</span>` : ""}</div>
                   <div class="dest-sub">${item.subtitle}</div>
                 </div>
                 <div class="dest-item-meta">
                   <span class="dest-distance">${item.distance}</span>
-                  <span class="dest-fav">收藏</span>
                 </div>
               </button>
             `).join("")}
@@ -1218,7 +1247,10 @@ function renderTabs() {
   el.innerHTML = tabs
     .map((x, i) => {
       const icon = tabIconSvg[x.icon] || tabIconSvg.home;
-      return `<button class="tab ${x.id === "home" ? "home-tab" : ""} ${i === state.index ? "active" : ""}" onclick="setTab(${i})"><span class="tab-icon">${icon}</span><span class="tab-text">${x.text}</span></button>`;
+      const iconMarkup = x.id === "home"
+        ? '<span class="tab-icon-home-mask" aria-hidden="true"></span>'
+        : icon;
+      return `<button class="tab ${x.id === "home" ? "home-tab" : ""} ${i === state.index ? "active" : ""}" onclick="setTab(${i})"><span class="tab-icon">${iconMarkup}</span><span class="tab-text">${x.text}</span></button>`;
     })
     .join("");
 }
