@@ -106,24 +106,19 @@ const mapRuntime = {
   pickupSyncTimer: null,
   pickupSyncPending: null,
   suppressCenterSyncUntil: 0,
-  listenersBound: false
+  listenersBound: false,
+  userAdjustedViewport: false
 };
 
 const DEMO_TENCENT_JS_KEY = "CSIBZ-OXWY3-MD23Q-RVESB-5CESS-YDBTD";
 const DEBUG_MODE_KEY = "md_debug";
 let pickupInitLoading = null;
-let DEBUG_MODE = (() => {
-  try {
-    const stored = localStorage.getItem(DEBUG_MODE_KEY);
-    if (stored === null) {
-      localStorage.setItem(DEBUG_MODE_KEY, "0");
-      return false;
-    }
-    return stored === "1";
-  } catch {
-    return false;
-  }
-})();
+let DEBUG_MODE = false;
+try {
+  localStorage.setItem(DEBUG_MODE_KEY, "0");
+} catch {
+  // ignore storage failures
+}
 
 function escapeHtml(text) {
   return String(text)
@@ -217,18 +212,18 @@ function getMapScene() {
   const tab = roleTabs[state.role][state.index]?.id;
   if (state.role === "passenger" && state.order.pickupLocation) {
     const pickup = state.order.pickupLocation;
-    return { lat: pickup.lat, lng: pickup.lng, zoom: 16, pitch: 0, rotation: 0 };
+    return { lat: pickup.lat, lng: pickup.lng, zoom: 17, pitch: 0, rotation: 0 };
   }
   if (state.role === "passenger" && tab === "home") {
-    return { lat: 22.543096, lng: 114.057865, zoom: 16, pitch: 0, rotation: 0 };
+    return { lat: 22.543096, lng: 114.057865, zoom: 17, pitch: 0, rotation: 0 };
   }
   if (state.role === "passenger" && tab === "trip") {
-    return { lat: 22.543096, lng: 114.057865, zoom: 15, pitch: 0, rotation: 0 };
+    return { lat: 22.543096, lng: 114.057865, zoom: 16, pitch: 0, rotation: 0 };
   }
   if (state.role === "driver") {
-    return { lat: 22.552023, lng: 114.093632, zoom: 14, pitch: 0, rotation: 0 };
+    return { lat: 22.552023, lng: 114.093632, zoom: 15, pitch: 0, rotation: 0 };
   }
-  return { lat: 22.543096, lng: 114.057865, zoom: 15, pitch: 0, rotation: 0 };
+  return { lat: 22.543096, lng: 114.057865, zoom: 16, pitch: 0, rotation: 0 };
 }
 
 function isPassengerHomeActive() {
@@ -260,11 +255,30 @@ function extractLatLng(point) {
 function setMapCenterLocation(location, zoom) {
   if (!mapRuntime.map || !window.TMap) return;
   const center = new TMap.LatLng(location.lat, location.lng);
+  mapRuntime.userAdjustedViewport = false;
   mapRuntime.suppressCenterSyncUntil = Date.now() + 500;
   mapRuntime.map.setCenter(center);
   if (typeof zoom === "number" && typeof mapRuntime.map.setZoom === "function") {
     mapRuntime.map.setZoom(zoom);
   }
+}
+
+function patchPassengerHomeView() {
+  if (!isPassengerHomeActive()) return;
+
+  const fromEl = document.querySelector(".from-text");
+  if (fromEl) {
+    fromEl.textContent = state.order.from || "当前位置";
+  }
+
+  if (!DEBUG_MODE) return;
+  const debugFeed = document.querySelector(".ride-debug-feed");
+  if (!debugFeed) return;
+
+  const lines = state.debugLogs && state.debugLogs.length
+    ? state.debugLogs.map((line) => `<div class="ride-debug-line">${escapeHtml(line)}</div>`).join("")
+    : '<div class="ride-debug-line ride-debug-empty">等待定位与地图进程输出...</div>';
+  debugFeed.innerHTML = lines;
 }
 
 async function syncPickupWithMapCenter() {
@@ -310,13 +324,14 @@ async function syncPickupWithMapCenter() {
     if (mapRuntime.pickupSyncPending === `${center.lat},${center.lng}`) {
       mapRuntime.pickupSyncPending = null;
     }
-    render();
+    patchPassengerHomeView();
   }
 }
 
 function schedulePickupCenterSync() {
   if (!isPassengerHomeActive()) return;
   if (Date.now() < mapRuntime.suppressCenterSyncUntil) return;
+  mapRuntime.userAdjustedViewport = true;
   clearTimeout(mapRuntime.pickupSyncTimer);
   mapRuntime.pickupSyncTimer = setTimeout(() => {
     syncPickupWithMapCenter();
@@ -558,6 +573,7 @@ async function mountMainMap(token) {
     mapRuntime.mapContainerId = "";
     mapRuntime.mapContainerEl = null;
     mapRuntime.listenersBound = false;
+    mapRuntime.userAdjustedViewport = false;
     return;
   }
 
@@ -589,6 +605,7 @@ async function mountMainMap(token) {
       }
       mapRuntime.map = null;
       mapRuntime.listenersBound = false;
+      mapRuntime.userAdjustedViewport = false;
     }
 
     if (!mapRuntime.map) {
@@ -603,15 +620,18 @@ async function mountMainMap(token) {
       mapRuntime.suppressCenterSyncUntil = Date.now() + 500;
       bindMainMapListeners();
     } else {
-      setMapCenterLocation({ lat: scene.lat, lng: scene.lng });
-      if (typeof mapRuntime.map.setZoom === "function") {
-        mapRuntime.map.setZoom(scene.zoom);
-      }
-      if (typeof mapRuntime.map.setPitch === "function") {
-        mapRuntime.map.setPitch(scene.pitch);
-      }
-      if (typeof mapRuntime.map.setRotation === "function") {
-        mapRuntime.map.setRotation(scene.rotation);
+      const keepViewport = isPassengerHomeActive() && mapRuntime.userAdjustedViewport;
+      if (!keepViewport) {
+        setMapCenterLocation({ lat: scene.lat, lng: scene.lng });
+        if (typeof mapRuntime.map.setZoom === "function") {
+          mapRuntime.map.setZoom(scene.zoom);
+        }
+        if (typeof mapRuntime.map.setPitch === "function") {
+          mapRuntime.map.setPitch(scene.pitch);
+        }
+        if (typeof mapRuntime.map.setRotation === "function") {
+          mapRuntime.map.setRotation(scene.rotation);
+        }
       }
       bindMainMapListeners();
     }
