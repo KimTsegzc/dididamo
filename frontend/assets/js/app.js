@@ -1,11 +1,22 @@
 ﻿const state = {
   role: "passenger",
-  index: 0,
+  index: 1,
   mapConfig: { enabled: false, keyMask: "" },
+  addressPanelOpen: false,
+  addressPanelMode: "to",
+  origin: {
+    status: "idle",
+    address: "环球中心-E3(新世纪环球中心)东南侧",
+    location: null,
+    nearby: [],
+    error: "",
+    updatedAt: "",
+    source: "browser-geolocation"
+  },
   user: {
-    passenger: { name: "乘客-阿杰", phone: "13800001234", loggedIn: false },
-    driver: { name: "司机-老陈", phone: "13900006688", loggedIn: false, online: false },
-    admin: { name: "平台管理员", phone: "admin", loggedIn: false }
+    passenger: { name: "乘客-阿杰", phone: "13800001234", loggedIn: true },
+    driver: { name: "司机-老陈", phone: "13900006688", loggedIn: true, online: false },
+    admin: { name: "平台管理员", phone: "admin", loggedIn: true }
   },
   order: {
     id: "MO20260705001",
@@ -32,25 +43,55 @@
 const roleCircle = ["passenger", "driver", "admin"];
 const roleName = { passenger: "乘客端", driver: "司机端", admin: "后台端" };
 
+const addressBook = {
+  recommended: [
+    { title: "成都馨乐庭城南公寓酒店(大源国际中心)", subtitle: "四川省成都市武侯区天府三街88号", distance: "800m", icon: "hotel" },
+    { title: "LAWSON罗森(峰汇中心店)", subtitle: "四川省成都市武侯区交子大道314号", distance: "329m", icon: "store" },
+    { title: "成都大熊猫繁育研究基地", subtitle: "四川省成都市成华区熊猫大道1375号", distance: "22.7km", icon: "spot", tag: "确认下车点" }
+  ],
+  cities: [
+    {
+      name: "成都市",
+      items: [
+        { title: "成都馨乐庭城南公寓酒店(大源国际中心)", subtitle: "四川省成都市武侯区天府三街88号ICON大源国际中心", distance: "800m", icon: "hotel" },
+        { title: "LAWSON罗森(峰汇中心店)", subtitle: "来自地图选点", distance: "304m", icon: "pin" }
+      ]
+    },
+    {
+      name: "广州市",
+      items: [
+        { title: "广州白云国际机场T2航站楼", subtitle: "广东省广州市花都区机场大道东888号广州白云国际机场", distance: "1214km", icon: "plane" },
+        { title: "中鼎君和名城珺合府-南门", subtitle: "广东省广州市黄埔区香秀二街西南四百米", distance: "1246km", icon: "pin" },
+        { title: "天河城-东门", subtitle: "广东省广州市天河区天河路208号天河城F1", distance: "1235km", icon: "pin" }
+      ]
+    }
+  ]
+};
+
 const roleTabs = {
   passenger: [
-    { id: "home", text: "首页" },
-    { id: "trip", text: "行程" },
-    { id: "orders", text: "订单" },
-    { id: "me", text: "我的" }
+    { id: "orders", text: "订单", icon: "ticket" },
+    { id: "home", text: "叫车", icon: "moto" },
+    { id: "me", text: "我的", icon: "me" }
   ],
   driver: [
-    { id: "desk", text: "工作台" },
-    { id: "todo", text: "接单" },
-    { id: "wallet", text: "钱包" },
-    { id: "history", text: "历史" }
+    { id: "todo", text: "订单", icon: "ticket" },
+    { id: "desk", text: "叫车", icon: "moto" },
+    { id: "history", text: "我的", icon: "me" }
   ],
   admin: [
-    { id: "dash", text: "看板" },
-    { id: "users", text: "用户" },
-    { id: "orders", text: "订单" },
-    { id: "setting", text: "设置" }
+    { id: "orders", text: "订单", icon: "ticket" },
+    { id: "dash", text: "叫车", icon: "moto" },
+    { id: "setting", text: "我的", icon: "me" }
   ]
+};
+
+const tabIconSvg = {
+  home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l8 6v9a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9l8-6z"/></svg>',
+  driver: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 14c5 0 9 2.2 9 5v1H3v-1c0-2.8 4-5 9-5z"/></svg>',
+  ticket: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7zm6 2h4v2h-4V9zm0 4h4v2h-4v-2z"/></svg>',
+  me: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 12c4.4 0 8 2.2 8 5v1H4v-1c0-2.8 3.6-5 8-5z"/></svg>',
+  moto: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 17a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 3.28 2.27h2.34l1.48-2.27H11V8h4.9a1 1 0 0 1 .84 1.55l-1.9 2.95h1.66A3.5 3.5 0 1 1 16.5 17h-10zM6.5 12a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm10 0a1.5 1.5 0 1 0 .001 3.001A1.5 1.5 0 0 0 16.5 12z"/></svg>'
 };
 
 const mapRuntime = {
@@ -62,6 +103,21 @@ const mapRuntime = {
   renderToken: 0
 };
 
+const DEMO_TENCENT_JS_KEY = "CSIBZ-OXWY3-MD23Q-RVESB-5CESS-YDBTD";
+const DEBUG_MODE_KEY = "md_debug";
+let DEBUG_MODE = (() => {
+  try {
+    const stored = localStorage.getItem(DEBUG_MODE_KEY);
+    if (stored === null) {
+      localStorage.setItem(DEBUG_MODE_KEY, "1");
+      return true;
+    }
+    return stored === "1";
+  } catch {
+    return true;
+  }
+})();
+
 function escapeHtml(text) {
   return String(text)
     .replaceAll("&", "&amp;")
@@ -71,8 +127,33 @@ function escapeHtml(text) {
     .replaceAll("'", "&#39;");
 }
 
+function ensureDebugLogState() {
+  if (!state.debugLogs) {
+    state.debugLogs = [];
+  }
+}
+
+function logDebug(message) {
+  if (!DEBUG_MODE) return;
+  ensureDebugLogState();
+  const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  state.debugLogs.unshift(`[${time}] ${message}`);
+  state.debugLogs = state.debugLogs.slice(0, 8);
+}
+
+function toggleDebugMode() {
+  DEBUG_MODE = !DEBUG_MODE;
+  try {
+    localStorage.setItem(DEBUG_MODE_KEY, DEBUG_MODE ? "1" : "0");
+  } catch {
+    // ignore storage failures
+  }
+  render();
+}
+
 async function fetchTencentBootstrap() {
   if (mapRuntime.bootstrap) return mapRuntime.bootstrap;
+  logDebug("拉取腾讯地图 bootstrap");
   const resp = await fetch("/api/tencent/bootstrap");
   if (!resp.ok) throw new Error("无法读取腾讯地图配置");
   mapRuntime.bootstrap = await resp.json();
@@ -81,20 +162,21 @@ async function fetchTencentBootstrap() {
 
 async function loadTencentSdk() {
   const boot = await fetchTencentBootstrap();
-  if (!boot.keyReady || !boot.jsApiUrl) {
-    throw new Error("腾讯地图 Key 未配置");
-  }
+  const sdkUrl = boot.keyReady && boot.jsApiUrl
+    ? boot.jsApiUrl
+    : `https://map.qq.com/api/gljs?v=1.exp&key=${encodeURIComponent(DEMO_TENCENT_JS_KEY)}`;
 
   if (window.TMap) return boot;
-  if (mapRuntime.sdkLoading && mapRuntime.sdkUrl === boot.jsApiUrl) {
+  if (mapRuntime.sdkLoading && mapRuntime.sdkUrl === sdkUrl) {
     await mapRuntime.sdkLoading;
     return boot;
   }
 
-  mapRuntime.sdkUrl = boot.jsApiUrl;
+  mapRuntime.sdkUrl = sdkUrl;
+  logDebug(`加载地图 SDK: ${boot.keyReady ? "线上 key" : "演示 key"}`);
   mapRuntime.sdkLoading = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = boot.jsApiUrl;
+    script.src = sdkUrl;
     script.async = true;
     script.onload = () => resolve(true);
     script.onerror = () => reject(new Error("腾讯地图 SDK 加载失败"));
@@ -110,6 +192,10 @@ async function loadTencentSdk() {
 
 function getMapScene() {
   const tab = roleTabs[state.role][state.index]?.id;
+  if (state.role === "passenger" && state.order.pickupLocation) {
+    const pickup = state.order.pickupLocation;
+    return { lat: pickup.lat, lng: pickup.lng, zoom: 16, pitch: 26, rotation: 12 };
+  }
   if (state.role === "passenger" && tab === "trip") {
     return { lat: 22.543096, lng: 114.057865, zoom: 13, pitch: 28, rotation: 8 };
   }
@@ -117,6 +203,128 @@ function getMapScene() {
     return { lat: 22.552023, lng: 114.093632, zoom: 12, pitch: 35, rotation: 15 };
   }
   return { lat: 22.543096, lng: 114.057865, zoom: 14, pitch: 30, rotation: 20 };
+}
+
+function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      logDebug("浏览器不支持定位");
+      reject(new Error("当前浏览器不支持定位"));
+      return;
+    }
+
+    logDebug("请求浏览器定位权限");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        logDebug(`定位成功: ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`);
+        resolve({
+          lat: Number(position.coords.latitude),
+          lng: Number(position.coords.longitude),
+          accuracy: Number(position.coords.accuracy || 0)
+        });
+      },
+      (error) => {
+        logDebug(`定位失败: ${error.message || error.code}`);
+        reject(error);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  });
+}
+
+async function fetchPickupPointFromLocation(location) {
+  logDebug("调用腾讯逆地址解析");
+  const query = new URLSearchParams({ location: `${location.lng},${location.lat}`, get_poi: "1" });
+  const resp = await fetch(`/api/tencent/geo/regeo?${query.toString()}`);
+  if (!resp.ok) {
+    let detail = "逆地址解析失败";
+    try {
+      const data = await resp.json();
+      detail = data?.message || data?.msg || data?.info || detail;
+    } catch {
+      // ignore parse failures
+    }
+    throw new Error(detail);
+  }
+  const data = await resp.json();
+  const result = data?.data?.result || {};
+  const address = result?.address || result?.formatted_addresses?.recommend || result?.formatted_addresses?.rough || "当前位置";
+  const poi = result?.address_component?.district ? `${result.address_component.district}${result.address_component.street || ""}` : "";
+  logDebug(`逆地址完成: ${address}`);
+  return {
+    address: poi ? `${address}` : address,
+    location,
+    raw: result
+  };
+}
+
+async function fetchNearbyPickupPois(location) {
+  const keywords = ["地铁站", "小区", "写字楼"];
+  const boundary = `nearby(${location.lng},${location.lat},1200,1)`;
+  logDebug("拉取附近上车点 POI");
+  const requests = keywords.map(async (keyword) => {
+    const query = new URLSearchParams({ keyword, boundary, page_size: "3", page_index: "1" });
+    const resp = await fetch(`/api/tencent/search/poi?${query.toString()}`);
+    if (!resp.ok) {
+      return [];
+    }
+    const data = await resp.json();
+    const list = data?.data?.data || [];
+    return list.map((item) => ({
+      title: item.title || item.name || "附近上车点",
+      address: item.address || item.addr || "",
+      category: keyword,
+      location: item.location || null
+    }));
+  });
+
+  const batches = await Promise.allSettled(requests);
+  const merged = [];
+  const seen = new Set();
+
+  for (const batch of batches) {
+    if (batch.status !== "fulfilled") continue;
+    for (const item of batch.value) {
+      const key = `${item.title}|${item.address}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+  }
+
+  logDebug(`附近上车点返回 ${merged.length} 条`);
+  return merged.slice(0, 6);
+}
+
+async function initPassengerPickup() {
+  try {
+    state.origin.status = "locating";
+    state.origin.error = "";
+    logDebug("初始化上车点开始");
+    const location = await getCurrentLocation();
+    const pickup = await fetchPickupPointFromLocation(location);
+    const nearby = await fetchNearbyPickupPois(location);
+    state.origin.status = "ready";
+    state.origin.address = pickup.address || state.origin.address;
+    state.origin.location = pickup.location;
+    state.origin.nearby = nearby;
+    state.origin.updatedAt = new Date().toISOString();
+    state.order.from = pickup.address || state.order.from;
+    state.order.currentLocation = location;
+    state.order.pickupLocation = pickup.location;
+    state.order.pickupRaw = pickup.raw;
+    logDebug("初始化上车点完成");
+    render();
+  } catch (error) {
+    state.origin.status = "fallback";
+    state.origin.error = error?.message || "定位失败";
+    state.order.currentLocation = null;
+    logDebug(`初始化上车点失败: ${state.origin.error}`);
+  }
+}
+
+function retryPickupInit() {
+  initPassengerPickup();
 }
 
 function showMapMessage(canvas, message) {
@@ -131,11 +339,6 @@ async function mountMainMap(token) {
     }
     mapRuntime.map = null;
     mapRuntime.mapContainerId = "";
-    return;
-  }
-
-  if (!state.mapConfig.enabled) {
-    showMapMessage(canvas, "地图未配置，请在后台端系统设置中保存腾讯 Key");
     return;
   }
 
@@ -203,15 +406,10 @@ function badge(status) {
   return `<span class="badge ${x[1]}">${x[0]}</span>`;
 }
 
-function mapBox(note) {
+function mapBox() {
   return `
     <div class="map-shell">
       <div class="map-canvas js-main-map"></div>
-      <div class="map-tip">
-        <div><strong>腾讯地图主视图</strong></div>
-        <div class="muted">地图配置: ${state.mapConfig.enabled ? "后端已配置" : "后端未配置"}</div>
-        <div class="muted">${note}</div>
-      </div>
     </div>
   `;
 }
@@ -231,13 +429,121 @@ function setOrder(status) {
 function switchRole() {
   const i = roleCircle.indexOf(state.role);
   state.role = roleCircle[(i + 1) % roleCircle.length];
-  state.index = 0;
+  state.index = 1;
+  state.addressPanelOpen = false;
   render();
 }
 
 function setTab(i) {
   state.index = i;
+  state.addressPanelOpen = false;
   render();
+}
+
+function openAddressPanel(mode) {
+  state.addressPanelMode = mode;
+  state.addressPanelOpen = true;
+  render();
+}
+
+function openDestinationPanel() {
+  openAddressPanel("to");
+}
+
+function openOriginPanel() {
+  openAddressPanel("from");
+}
+
+function closeDestinationPanel() {
+  state.addressPanelOpen = false;
+  render();
+}
+
+function chooseDestination(name) {
+  if (state.addressPanelMode === "from") {
+    state.order.from = name;
+    state.origin.address = name;
+  } else {
+    state.order.to = name;
+  }
+  state.addressPanelOpen = false;
+  render();
+}
+
+function renderAddressIcon(icon) {
+  const icons = {
+    hotel: "▭",
+    store: "◫",
+    spot: "△",
+    plane: "✈",
+    pin: "◎"
+  };
+  return icons[icon] || "◎";
+}
+
+function renderAddressPanel() {
+  const isOrigin = state.addressPanelMode === "from";
+  const placeholder = isOrigin ? "请输入起点" : "您要去哪儿";
+  const dotClass = isOrigin ? "origin-dot" : "dest-dot";
+  const quickItems = isOrigin
+    ? ["家", "公司", "收藏夹"]
+    : ["家", "公司", "收藏夹", "地图选点"];
+  const topItems = isOrigin ? addressBook.cities : [{ name: "为你推荐", items: addressBook.recommended, recommended: true }, ...addressBook.cities];
+
+  return `
+    <section class="dest-panel" role="dialog" aria-label="地址输入">
+      <div class="dest-topbar">
+        <button class="dest-back" onclick="closeDestinationPanel()">‹</button>
+        <div class="dest-brand">摩滴</div>
+        <div class="dest-tools">
+          <button class="dest-tool">•••</button>
+          <button class="dest-tool">◎</button>
+        </div>
+      </div>
+      <div class="dest-input-wrap didi-panel-input">
+        <span class="${dotClass}"></span>
+        <input class="dest-input" placeholder="${placeholder}" autofocus />
+        ${isOrigin ? "" : '<button class="dest-pass">+ 途经点</button>'}
+      </div>
+      <div class="dest-quick ${isOrigin ? "origin-quick" : ""}">
+        ${quickItems.map((item) => `<button class="quick-item">${item}</button>`).join("")}
+      </div>
+      <div class="dest-list-stack">
+        ${topItems.map((section) => `
+          <section class="dest-list-card ${section.recommended ? "recommended-card" : ""}">
+            <div class="dest-list-title ${section.recommended ? "recommended-title" : "city-title"}">${section.name}</div>
+            ${section.items.map((item) => `
+              <button class="dest-item rich-dest-item" onclick="chooseDestination('${escapeHtml(item.title).replaceAll("&#39;", "\\'")}')">
+                <div class="dest-item-icon">${renderAddressIcon(item.icon)}</div>
+                <div class="dest-item-copy">
+                  <div class="dest-main">${item.title}${item.tag ? `<span class="dest-tag">${item.tag}</span>` : ""}</div>
+                  <div class="dest-sub">${item.subtitle}</div>
+                </div>
+                <div class="dest-item-meta">
+                  <span class="dest-distance">${item.distance}</span>
+                  <span class="dest-fav">收藏</span>
+                </div>
+              </button>
+            `).join("")}
+          </section>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function choosePickupPoint(pickup) {
+  state.origin.address = pickup.address ? `${pickup.title} · ${pickup.address}` : pickup.title;
+  state.order.from = state.origin.address;
+  state.origin.location = pickup.location || state.origin.location;
+  state.order.pickupLocation = pickup.location || state.order.pickupLocation;
+  render();
+}
+
+function choosePickupPointByIndex(index) {
+  const pickup = state.origin.nearby[index];
+  if (!pickup) return;
+  choosePickupPoint(pickup);
 }
 
 function mockLogin() {
@@ -247,8 +553,7 @@ function mockLogin() {
 }
 
 function mockLogout() {
-  state.user[state.role].loggedIn = false;
-  alert(`${roleName[state.role]}已退出（演示）`);
+  alert("当前为调试免登录模式，不退出登录");
   render();
 }
 
@@ -311,17 +616,49 @@ function passengerScreen(tab) {
   }
 
   if (tab === "home") {
+    const destinationPanel = state.addressPanelOpen ? renderAddressPanel() : "";
+
     return `
-      <section class="card">
-        <h3 class="title">现在出发</h3>
-        ${mapBox("上车点/目的地选择与路线渲染预留")}
-        <div class="row"><span>起点</span><strong>${state.order.from}</strong></div>
-        <div class="row"><span>终点</span><strong>${state.order.to}</strong></div>
-        <div class="row"><span>一口价</span><strong>${state.order.fee} 元</strong></div>
-        <div class="actions">
-          <button class="btn" onclick="setOrder('waiting')">呼叫摩的</button>
-          <button class="btn alt" onclick="setOrder('cancelled')">取消</button>
+      <section class="ride-home">
+        <div class="ride-map-stage">
+          ${mapBox()}
+          <button class="debug-switch" aria-label="切换调试模式" title="切换调试模式" onclick="toggleDebugMode()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94a7.43 7.43 0 0 0 .05-.94 7.43 7.43 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 14.86 1h-3.72a.5.5 0 0 0-.49.42l-.36 2.54c-.57.22-1.12.53-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L3.74 7.48a.5.5 0 0 0 .12.64l2.03 1.58a7.43 7.43 0 0 0-.05.94c0 .32.02.63.05.94L3.86 13.16a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.61.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.72c.24 0 .45-.18.49-.42l.36-2.54c.57-.22 1.12-.53 1.63-.94l2.39.96c.22.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/></svg>
+            <span class="debug-switch-text">${DEBUG_MODE ? "调试" : "用户"}</span>
+          </button>
         </div>
+
+        <div class="ride-dock">
+          <button class="ride-locator ride-origin-trigger" onclick="openOriginPanel()">
+            <div class="dot"></div>
+            <div class="from-text">${state.order.from}</div>
+          </button>
+
+          <button class="ride-search" onclick="openDestinationPanel()">
+            <span class="search-icon">⌕</span>
+            <span class="search-text-main">输入目的地</span>
+            <span class="search-chip">去：${escapeHtml(state.order.to || "")}</span>
+          </button>
+
+          <div class="ride-shortcuts">
+            <button class="shortcut">预约</button>
+            <button class="shortcut">帮人叫车</button>
+          </div>
+
+          ${DEBUG_MODE ? `
+            <div class="ride-debug">
+              <div class="ride-debug-title">定位日志</div>
+              <div class="ride-debug-feed">
+                ${state.debugLogs && state.debugLogs.length
+                  ? state.debugLogs.map((line) => `<div class="ride-debug-line">${escapeHtml(line)}</div>`).join("")
+                  : '<div class="ride-debug-line ride-debug-empty">等待定位与地图进程输出...</div>'}
+              </div>
+              <button class="ride-debug-toggle" onclick="retryPickupInit()">重新拉取定位</button>
+            </div>
+          ` : ''}
+        </div>
+
+        ${destinationPanel}
       </section>
     `;
   }
@@ -331,7 +668,7 @@ function passengerScreen(tab) {
       return `
         <section class="card">
           <h3 class="title">呼叫等待</h3>
-          ${mapBox("正在为你匹配附近司机")}
+          ${mapBox()}
           <p>状态：${badge(state.order.status)}</p>
           <div class="actions">
             <button class="btn" onclick="setOrder('accepted')">模拟司机接单</button>
@@ -344,7 +681,7 @@ function passengerScreen(tab) {
       return `
         <section class="card">
           <h3 class="title">司机正在赶来</h3>
-          ${mapBox("司机位置与行程状态同步（模拟）")}
+          ${mapBox()}
           <div class="row"><span>司机</span><strong>${state.order.driver}</strong></div>
           <div class="row"><span>距离</span><strong>${state.order.distance} km</strong></div>
           <div class="row"><span>时长</span><strong>${state.order.duration} 分钟</strong></div>
@@ -382,6 +719,30 @@ function passengerScreen(tab) {
     `;
   }
 
+  if (tab === "me") {
+    return `
+      <section class="card">
+        <h3 class="title">个人中心</h3>
+        <p>昵称：${state.user.passenger.name}</p>
+        <p>虚拟钱包：${state.finance.walletPassenger.toFixed(2)} 元</p>
+        <p class="muted">当前为调试免登录模式</p>
+      </section>
+      <section class="card">
+        <h3 class="title">调试后台</h3>
+        <div class="debug-grid">
+          <div class="debug-row"><span>定位状态</span><strong>${state.origin.status}</strong></div>
+          <div class="debug-row"><span>定位来源</span><strong>${state.origin.source}</strong></div>
+          <div class="debug-row"><span>上车点</span><strong>${state.origin.address || "-"}</strong></div>
+          <div class="debug-row"><span>当前位置</span><strong>${state.order.currentLocation ? `${state.order.currentLocation.lat.toFixed(6)}, ${state.order.currentLocation.lng.toFixed(6)}` : "-"}</strong></div>
+          <div class="debug-row"><span>POI 数量</span><strong>${state.origin.nearby.length}</strong></div>
+          <div class="debug-row"><span>腾讯后端</span><strong>${state.mapConfig.enabled ? `已配置 ${state.mapConfig.keyMask}` : "未配置"}</strong></div>
+          <div class="debug-row full"><span>定位错误</span><strong>${state.origin.error || "无"}</strong></div>
+        </div>
+        <button class="btn alt" onclick="retryPickupInit()">重新拉取定位</button>
+      </section>
+    `;
+  }
+
   return `
     <section class="card">
       <h3 class="title">个人中心</h3>
@@ -408,7 +769,7 @@ function driverScreen(tab) {
     return `
       <section class="card">
         <h3 class="title">司机工作台</h3>
-        ${mapBox("接单导航与热力点位预留")}
+        ${mapBox()}
         <p>接单状态：${state.user.driver.online ? '<span class="badge ok">在线</span>' : '<span class="badge warn">离线</span>'}</p>
         <div class="actions">
           <button class="btn" onclick="state.user.driver.online=true; render()">上线接单</button>
@@ -431,7 +792,7 @@ function driverScreen(tab) {
       </section>
       <section class="card">
         <h3 class="title">接驾 / 行程</h3>
-        ${mapBox("导航到上车点与行程路线")}
+        ${mapBox()}
         <div class="actions">
           <button class="btn" onclick="setOrder('ontrip')">开始行程</button>
           <button class="btn alt" onclick="setOrder('completed')">结束行程</button>
@@ -480,6 +841,21 @@ function adminScreen(tab) {
         <div class="row"><span>实时订单总量</span><strong>${state.finance.totalOrders}</strong></div>
         <div class="row"><span>在线司机数</span><strong>${state.finance.onlineDrivers}</strong></div>
         <div class="row"><span>今日虚拟收入</span><strong>${state.finance.todayIncome.toFixed(2)} 元</strong></div>
+        <div class="row"><span>腾讯后端</span><strong>${state.mapConfig.enabled ? `已配置 ${state.mapConfig.keyMask}` : "未配置"}</strong></div>
+        <button class="btn alt" onclick="retryPickupInit()">重新拉取定位</button>
+      </section>
+      <section class="card">
+        <h3 class="title">定位调试</h3>
+        <div class="debug-grid">
+          <div class="debug-row"><span>定位状态</span><strong>${state.origin.status}</strong></div>
+          <div class="debug-row"><span>定位来源</span><strong>${state.origin.source}</strong></div>
+          <div class="debug-row"><span>上车点</span><strong>${state.origin.address || "-"}</strong></div>
+          <div class="debug-row"><span>更新时间</span><strong>${state.origin.updatedAt || "-"}</strong></div>
+          <div class="debug-row"><span>当前位置</span><strong>${state.order.currentLocation ? `${state.order.currentLocation.lat.toFixed(6)}, ${state.order.currentLocation.lng.toFixed(6)}` : "-"}</strong></div>
+          <div class="debug-row"><span>POI 数量</span><strong>${state.origin.nearby.length}</strong></div>
+          <div class="debug-row full"><span>定位错误</span><strong>${state.origin.error || "无"}</strong></div>
+          <div class="debug-row full"><span>逆地理原文</span><strong>${state.order.pickupRaw ? escapeHtml(JSON.stringify(state.order.pickupRaw)) : "-"}</strong></div>
+        </div>
       </section>
     `;
   }
@@ -524,24 +900,28 @@ function renderTabs() {
   const tabs = roleTabs[state.role];
   const el = document.getElementById("mobileTabs");
   el.innerHTML = tabs
-    .map((x, i) => `<button class="tab ${i === state.index ? "active" : ""}" onclick="setTab(${i})">${x.text}</button>`)
+    .map((x, i) => {
+      const icon = tabIconSvg[x.icon] || tabIconSvg.home;
+      return `<button class="tab ${x.id === "home" ? "home-tab" : ""} ${i === state.index ? "active" : ""}" onclick="setTab(${i})"><span class="tab-icon">${icon}</span><span class="tab-text">${x.text}</span></button>`;
+    })
     .join("");
 }
 
 function renderView() {
   const tab = roleTabs[state.role][state.index].id;
   const view = document.getElementById("view");
+  view.classList.toggle("screen-home", state.role === "passenger" && tab === "home");
   if (state.role === "passenger") view.innerHTML = passengerScreen(tab);
   if (state.role === "driver") view.innerHTML = driverScreen(tab);
   if (state.role === "admin") view.innerHTML = adminScreen(tab);
 }
 
 function renderMeta() {
-  document.getElementById("roleLabel").textContent = `当前角色: ${roleName[state.role]}`;
-  document.getElementById("statusLabel").textContent = `当前订单: ${state.order.id} / ${state.order.status}`;
-  document.getElementById("mapConfigLabel").textContent = state.mapConfig.enabled
-    ? `地图配置: 已配置 (${state.mapConfig.keyMask})`
-    : "地图配置: 未配置（请在后台端系统设置中保存）";
+  const root = document.querySelector(".phone-shell");
+  if (root) {
+    root.dataset.role = state.role;
+    root.dataset.orderStatus = state.order.status;
+  }
 }
 
 function render() {
@@ -553,15 +933,25 @@ function render() {
 
 async function loadPublicConfig() {
   try {
-    const resp = await fetch("/api/config/public");
-    if (!resp.ok) return;
-    const data = await resp.json();
-    state.mapConfig = data.tencent || state.mapConfig;
+    const [publicResp, bootResp] = await Promise.all([
+      fetch("/api/config/public"),
+      fetch("/api/tencent/bootstrap")
+    ]);
+
+    if (publicResp.ok) {
+      const data = await publicResp.json();
+      state.mapConfig = data.tencent || state.mapConfig;
+    }
+
+    if (bootResp.ok) {
+      const boot = await bootResp.json();
+      state.mapConfig.enabled = Boolean(boot.keyReady);
+      state.mapConfig.keyMask = boot.keyMask || state.mapConfig.keyMask;
+    }
   } catch {
     state.mapConfig = { enabled: false, keyMask: "" };
   }
 }
 
-document.getElementById("roleSwitchBtn").addEventListener("click", switchRole);
-
 loadPublicConfig().then(render);
+initPassengerPickup();

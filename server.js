@@ -103,6 +103,11 @@ function buildTencentJsApiUrl() {
   return `https://map.qq.com/api/gljs?${params.toString()}`;
 }
 
+function getTencentServiceKey() {
+  const cfg = readRuntimeConfig().tencent;
+  return cfg.webServiceKey || cfg.jsApiKey || "";
+}
+
 async function requestAmap(url) {
   const resp = await fetch(url);
   const text = await resp.text();
@@ -197,7 +202,7 @@ async function handleApi(req, res, cleanUrl) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const keyword = url.searchParams.get("keyword") || "";
     const region = url.searchParams.get("region") || "北京";
-    const apiKey = readRuntimeConfig().tencent.webServiceKey;
+    const apiKey = getTencentServiceKey();
     if (!apiKey) {
       return send(res, 400, JSON.stringify({ ok: false, message: "tencent.webServiceKey 未配置" }), "application/json; charset=utf-8");
     }
@@ -216,7 +221,7 @@ async function handleApi(req, res, cleanUrl) {
     const boundary = url.searchParams.get("boundary") || "region(北京,0)";
     const page_size = url.searchParams.get("page_size") || "5";
     const page_index = url.searchParams.get("page_index") || "1";
-    const apiKey = readRuntimeConfig().tencent.webServiceKey;
+    const apiKey = getTencentServiceKey();
     if (!apiKey) {
       return send(res, 400, JSON.stringify({ ok: false, message: "tencent.webServiceKey 未配置" }), "application/json; charset=utf-8");
     }
@@ -233,7 +238,7 @@ async function handleApi(req, res, cleanUrl) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const address = url.searchParams.get("address") || "";
     const region = url.searchParams.get("region") || "北京";
-    const apiKey = readRuntimeConfig().tencent.webServiceKey;
+    const apiKey = getTencentServiceKey();
     if (!apiKey) {
       return send(res, 400, JSON.stringify({ ok: false, message: "tencent.webServiceKey 未配置" }), "application/json; charset=utf-8");
     }
@@ -250,7 +255,7 @@ async function handleApi(req, res, cleanUrl) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const location = url.searchParams.get("location") || "";
     const get_poi = url.searchParams.get("get_poi") || "1";
-    const apiKey = readRuntimeConfig().tencent.webServiceKey;
+    const apiKey = getTencentServiceKey();
     if (!apiKey) {
       return send(res, 400, JSON.stringify({ ok: false, message: "tencent.webServiceKey 未配置" }), "application/json; charset=utf-8");
     }
@@ -268,7 +273,7 @@ async function handleApi(req, res, cleanUrl) {
     const from = url.searchParams.get("from") || "";
     const to = url.searchParams.get("to") || "";
     const policy = url.searchParams.get("policy") || "0";
-    const apiKey = readRuntimeConfig().tencent.webServiceKey;
+    const apiKey = getTencentServiceKey();
     if (!apiKey) {
       return send(res, 400, JSON.stringify({ ok: false, message: "tencent.webServiceKey 未配置" }), "application/json; charset=utf-8");
     }
