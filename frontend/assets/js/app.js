@@ -71,7 +71,7 @@ const addressBook = {
 const roleTabs = {
   passenger: [
     { id: "orders", text: "订单", icon: "ticket" },
-    { id: "home", text: "叫车", icon: "moto" },
+    { id: "home", text: "打摩的", icon: "moto" },
     { id: "me", text: "我的", icon: "me" }
   ],
   driver: [
