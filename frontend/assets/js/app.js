@@ -96,6 +96,7 @@ const tabIconSvg = {
 
 const mapRuntime = {
   bootstrap: null,
+  bootstrapLoading: null,
   sdkLoading: null,
   sdkUrl: "",
   map: null,
@@ -105,6 +106,7 @@ const mapRuntime = {
 
 const DEMO_TENCENT_JS_KEY = "CSIBZ-OXWY3-MD23Q-RVESB-5CESS-YDBTD";
 const DEBUG_MODE_KEY = "md_debug";
+let pickupInitLoading = null;
 let DEBUG_MODE = (() => {
   try {
     const stored = localStorage.getItem(DEBUG_MODE_KEY);
@@ -161,11 +163,19 @@ function toggleDebugMode() {
 
 async function fetchTencentBootstrap() {
   if (mapRuntime.bootstrap) return mapRuntime.bootstrap;
+  if (mapRuntime.bootstrapLoading) return mapRuntime.bootstrapLoading;
   logDebug("拉取腾讯地图 bootstrap");
-  const resp = await fetch("/api/tencent/bootstrap");
-  if (!resp.ok) throw new Error("无法读取腾讯地图配置");
-  mapRuntime.bootstrap = await resp.json();
-  return mapRuntime.bootstrap;
+  mapRuntime.bootstrapLoading = (async () => {
+    const resp = await fetch("/api/tencent/bootstrap");
+    if (!resp.ok) throw new Error("无法读取腾讯地图配置");
+    mapRuntime.bootstrap = await resp.json();
+    return mapRuntime.bootstrap;
+  })();
+  try {
+    return await mapRuntime.bootstrapLoading;
+  } finally {
+    mapRuntime.bootstrapLoading = null;
+  }
 }
 
 async function loadTencentSdk() {
@@ -317,8 +327,10 @@ async function fetchNearbyPickupPois(location) {
 }
 
 async function initPassengerPickup() {
+  if (pickupInitLoading) return pickupInitLoading;
   let location = null;
-  try {
+  pickupInitLoading = (async () => {
+    try {
     state.origin.status = "locating";
     state.origin.error = "";
     logDebug("初始化上车点开始");
@@ -337,24 +349,32 @@ async function initPassengerPickup() {
     state.order.pickupRaw = pickup.raw;
     logDebug("初始化上车点完成");
     render();
-  } catch (error) {
-    state.origin.error = error?.message || "定位失败";
-    if (location) {
-      state.origin.status = "ready";
-      state.origin.address = "当前位置";
-      state.origin.location = location;
-      state.origin.updatedAt = new Date().toISOString();
-      state.order.from = "当前位置";
-      state.order.currentLocation = location;
-      state.order.pickupLocation = location;
-      logDebug(`逆地址不可用，降级使用坐标初始化: ${state.origin.error}`);
-    } else {
-      state.origin.status = "fallback";
-      state.order.currentLocation = null;
-      logDebug(`初始化上车点失败: ${state.origin.error}`);
+    } catch (error) {
+      state.origin.error = error?.message || "定位失败";
+      const denied = /denied|permission|授权/i.test(state.origin.error);
+      if (location) {
+        state.origin.status = "ready";
+        state.origin.address = "当前位置";
+        state.origin.location = location;
+        state.origin.updatedAt = new Date().toISOString();
+        state.order.from = "当前位置";
+        state.order.currentLocation = location;
+        state.order.pickupLocation = location;
+        logDebug(`逆地址不可用，降级使用坐标初始化: ${state.origin.error}`);
+      } else {
+        state.origin.status = "fallback";
+        state.order.currentLocation = null;
+        if (denied) {
+          logDebug("浏览器拒绝了定位授权，后端未参与本次失败");
+        }
+        logDebug(`初始化上车点失败: ${state.origin.error}`);
+      }
+      render();
+    } finally {
+      pickupInitLoading = null;
     }
-    render();
-  }
+  })();
+  return pickupInitLoading;
 }
 
 function retryPickupInit() {
