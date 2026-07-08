@@ -1,5 +1,7 @@
 ﻿#!/bin/bash
 
+set -u
+
 PID_FILE="$(dirname "$0")/.server-pid.txt"
 PORT=4173
 SERVER_DIR="$(dirname "$0")/.."
@@ -28,6 +30,18 @@ delete_pid() {
 check_port_in_use() {
     nc -z localhost $PORT 2>/dev/null
     return $?
+}
+
+get_port_pids() {
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -ti:$PORT 2>/dev/null | tr '\n' ' '
+        return 0
+    fi
+    if command -v ss >/dev/null 2>&1; then
+        ss -ltnp 2>/dev/null | awk -v p=":$PORT" '$4 ~ p {print $NF}' | grep -oE 'pid=[0-9]+' | cut -d= -f2 | tr '\n' ' '
+        return 0
+    fi
+    echo ""
 }
 
 start_server() {
@@ -70,22 +84,23 @@ stop_server() {
         sleep 1
         if ! kill -0 $pid 2>/dev/null; then
             echo -e "${GREEN}✅ 服务已停止！(PID: $pid)${NC}"
-            delete_pid
-            return 0
-        fi
-        kill -9 $pid 2>/dev/null
-        echo -e "${GREEN}✅ 服务已强制停止！(PID: $pid)${NC}"
-        delete_pid
-        return 0
-    else
-        local port_pid=$(lsof -ti:$PORT 2>/dev/null)
-        if [ -n "$port_pid" ]; then
-            kill -9 $port_pid 2>/dev/null
-            echo -e "${GREEN}✅ 服务已停止！(PID: $port_pid)${NC}"
-            delete_pid
-            return 0
+        else
+            kill -9 $pid 2>/dev/null
+            echo -e "${GREEN}✅ 服务已强制停止！(PID: $pid)${NC}"
         fi
     fi
+
+    # If the port is still occupied, force-kill all listeners on this port.
+    local port_pids=$(get_port_pids)
+    if [ -n "$port_pids" ]; then
+        for port_pid in $port_pids; do
+            kill -9 "$port_pid" 2>/dev/null || true
+            echo -e "${GREEN}✅ 已清理端口占用进程 (PID: $port_pid)${NC}"
+        done
+    fi
+
+    delete_pid
+    return 0
 }
 
 restart_server() {

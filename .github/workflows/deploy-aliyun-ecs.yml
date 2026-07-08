@@ -75,6 +75,9 @@ jobs:
             git pull --ff-only origin main
           fi
 
+          # Normalize line endings/encoding for shell scripts from Windows commits.
+          sed -i 's/\r$//' start/*.sh || true
+          sed -i '1s/^\xEF\xBB\xBF//' start/*.sh || true
           chmod +x start/*.sh || true
           bash start/restart.sh
 
@@ -89,17 +92,17 @@ jobs:
             -o ConnectTimeout=20 \
             -o BatchMode=yes \
             "$ECS_USER@$ECS_HOST" \
-            "for i in {1..30}; do curl -fsS http://localhost:$APP_PORT >/dev/null && echo '[OK] service up on localhost' && exit 0; sleep 1; done; echo '[ERR] localhost health failed'; tail -n 120 '$ECS_PROJECT_PATH/app.log' || true; exit 1"
+            "for i in {1..30}; do curl -fsS http://localhost:$APP_PORT/api/health >/dev/null && echo '[OK] service up on localhost' && exit 0; sleep 1; done; echo '[ERR] localhost health failed'; tail -n 120 '$ECS_PROJECT_PATH/app.log' || true; exit 1"
 
       - name: Health check from public network
         run: |
           for i in {1..20}; do
-            if curl -fsS "http://$ECS_HOST:$APP_PORT" >/dev/null; then
-              echo "[OK] public health passed: http://$ECS_HOST:$APP_PORT"
+            if curl -fsS "http://$ECS_HOST:$APP_PORT/api/health" >/dev/null; then
+              echo "[OK] public health passed: http://$ECS_HOST:$APP_PORT/api/health"
               exit 0
             fi
             echo "[WAIT] public health retry ($i/20)"
             sleep 2
           done
-          echo "[ERR] public health failed: http://$ECS_HOST:$APP_PORT"
+          echo "[ERR] public health failed: http://$ECS_HOST:$APP_PORT/api/health"
           exit 1
