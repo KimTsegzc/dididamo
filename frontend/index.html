@@ -1,29 +1,23 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>摩的出行一期移动端 MVP</title>
+    <title>摩的出行移动端 MVP</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Ma+Shan+Zheng&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/css/styles.css" />
   </head>
   <body>
-    <div class="bg-glow">
-      <div class="blob b1"></div>
-      <div class="blob b2"></div>
-    </div>
+    <div class="bg-pattern"></div>
 
     <main class="phone-wrap">
       <section class="phone-shell">
         <header class="mobile-head">
           <div>
-            <div class="brand">MotoFlow</div>
-            <div class="sub">摩的出行 一期演示版</div>
+            <div class="brand">滴滴摩的</div>
+            <div class="sub">MVP 演示</div>
           </div>
           <button id="roleSwitchBtn" class="chip">切换角色</button>
         </header>
@@ -37,16 +31,14 @@
 
       <section class="dock">
         <div class="dock-card">
-          <h3>全局配置</h3>
-          <label>高德 KEY</label>
-          <input id="gaodeKeyInput" placeholder="window.GAODE_API_KEY" />
-          <button id="saveKeyBtn" class="btn">保存到全局变量</button>
+          <h3>系统状态</h3>
+          <p id="mapConfigLabel" class="note">地图配置读取中...</p>
           <p id="roleLabel" class="note"></p>
           <p id="statusLabel" class="note"></p>
         </div>
-      </div>
+      </section>
     </main>
 
-    <script src="app.js"></script>
+    <script src="/assets/js/app.js"></script>
   </body>
 </html>
