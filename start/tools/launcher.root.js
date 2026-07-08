@@ -5,6 +5,7 @@ const http = require("http");
 
 const PID_FILE = path.join(__dirname, ".server-pid.txt");
 const PORT = 4173;
+const ROOT_DIR = path.resolve(__dirname, "..", "..");
 
 // 保存PID到文件
 function savePID(pid) {
@@ -49,7 +50,7 @@ async function startServer() {
 
   console.log("🚀 正在启动服务...");
   const server = spawn("node", ["server.js"], {
-    cwd: __dirname,
+    cwd: ROOT_DIR,
     stdio: "inherit",
     detached: true
   });

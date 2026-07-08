@@ -1,5 +1,13 @@
-{
+﻿{
+  "tencent": {
+    "jsApiKey": "CSIBZ-OXWY3-MD23Q-RVESB-5CESS-YDBTD",
+    "webServiceKey": "",
+    "appKey": "",
+    "securityJsCode": ""
+  },
   "amap": {
-    "webKey": ""
+    "jsApiKey": "788339595ce3232036976af44443597f",
+    "webServiceKey": "788339595ce3232036976af44443597f",
+    "securityJsCode": ""
   }
 }

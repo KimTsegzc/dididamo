@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <title>TCMapApi - 腾讯地图组件</title>
+  <script charset="utf-8" src="https://map.qq.com/api/gljs?v=1.exp&key=CSIBZ-OXWY3-MD23Q-RVESB-5CESS-YDBTD"></script>
+  <style type="text/css">
+    html,
+    body {
+      height: 100%;
+      margin: 0px;
+      padding: 0px;
+      overflow: hidden;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0d1624;
+    }
+
+    #container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .tag {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      background: rgba(8, 15, 26, 0.72);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 14px;
+      padding: 10px 14px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .tag strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .tag span {
+      font-size: 12px;
+      opacity: 0.86;
+    }
+  </style>
+</head>
+<body onload="initMap()">
+  <div id="container"></div>
+  <div class="tag">
+    <strong>TCMapApi</strong>
+    <span>腾讯地图主入口</span>
+  </div>
+  <script type="text/javascript">
+    function initMap() {
+      var center = new TMap.LatLng(39.984104, 116.307503);
+      var map = new TMap.Map("container", {
+        rotation: 20,
+        pitch: 30,
+        zoom: 12,
+        center: center
+      });
+
+      map.on("click", function (evt) {
+        console.log("map click", evt);
+      });
+    }
+  </script>
+</body>
+</html>

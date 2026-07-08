@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TCMapApi - 接口测试</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="/TCMapApi/assets/js/shared.js" defer></script>
+  <style>
+    :root { color-scheme: light; --bg:#f4f9ff; --card:#ffffff; --ink:#152033; --muted:#5c697d; --line:#dbe6f4; --brand:#0c7bdc; --brand2:#15a0a0; --warn:#d97a1d; --ok:#1f9d6a; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Outfit', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: linear-gradient(180deg, #eef7ff, #f9fbff 45%, #ffffff 100%); color: var(--ink); }
+    .shell { width: min(100%, 900px); margin: 0 auto; padding: 18px 16px 36px; }
+    .top { display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 16px; }
+    .back { text-decoration:none; color: var(--brand); font-weight: 700; }
+    .hero { background: linear-gradient(135deg, rgba(12,123,220,.96), rgba(21,160,160,.92)); color: #fff; border-radius: 24px; padding: 20px; box-shadow: 0 18px 50px rgba(12,123,220,.18); }
+    .hero h1 { margin: 0 0 8px; font-size: 28px; }
+    .hero p { margin: 0; line-height: 1.7; color: rgba(255,255,255,.92); }
+    .grid { display: grid; gap: 14px; margin-top: 14px; }
+    .card { background: rgba(255,255,255,.95); border: 1px solid var(--line); border-radius: 20px; padding: 16px; box-shadow: 0 12px 28px rgba(22,34,53,.06); }
+    .title { margin: 0 0 8px; font-size: 18px; }
+    .muted { color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .actions { display:flex; gap: 10px; flex-wrap: wrap; }
+    .btn { appearance:none; border:0; padding: 11px 14px; border-radius: 14px; color:#fff; font-weight:700; background: linear-gradient(135deg, var(--brand), var(--brand2)); }
+    .btn.alt { color: var(--ink); background: #f5f8fd; border: 1px solid var(--line); }
+    label { display:block; margin-top: 12px; font-weight: 700; font-size: 14px; }
+    input { width: 100%; margin-top: 8px; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font: inherit; background: #fff; }
+    .badge { display:inline-flex; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .badge.ok { background: rgba(31,157,106,.14); color: var(--ok); }
+    .badge.warn { background: rgba(217,122,29,.14); color: var(--warn); }
+    .panel { min-height: 280px; border: 1px solid var(--line); border-radius: 18px; background: #08111e; color: #d8e4f5; overflow: hidden; }
+    pre { margin: 0; padding: 16px; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.65; }
+    @media (min-width: 860px) { .grid { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <div>
+        <div class="muted">TCMapApi Check</div>
+        <h1 style="margin:4px 0 0;">接口测试台</h1>
+      </div>
+      <a class="back" href="/TCMapApi/">返回首页</a>
+    </div>
+
+    <section class="hero">
+      <h1>先验证后端代理，再接业务页</h1>
+      <p>这一页只看腾讯链路是否已经打通：健康检查、输入提示、POI、地理编码、逆地理编码和路线规划。</p>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3 class="title">测试项</h3>
+        <div class="actions">
+          <button class="btn" data-action="health">健康检查</button>
+          <button class="btn" data-action="suggestion">输入提示</button>
+          <button class="btn" data-action="poi">POI 搜索</button>
+          <button class="btn" data-action="geocode">地理编码</button>
+          <button class="btn" data-action="regeo">逆地理编码</button>
+          <button class="btn" data-action="route">路线规划</button>
+        </div>
+        <label>测试输入<input id="paramInput" value="深圳北站" /></label>
+        <p class="muted">输入提示和 POI 搜索会优先使用这个值，其它接口按当前页默认参数执行。</p>
+        <div id="apiState" class="badge warn">等待执行</div>
+      </div>
+      <div class="card">
+        <h3 class="title">返回结果</h3>
+        <div id="resultPanel" class="panel"><pre>请选择一个测试项</pre></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const resultPanel = document.getElementById('resultPanel');
+    const apiState = document.getElementById('apiState');
+
+    function showResult(data) {
+      resultPanel.innerHTML = `<pre>${TCMapKit.escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+    }
+
+    async function runAction(action) {
+      const value = document.getElementById('paramInput').value.trim();
+      apiState.className = 'badge warn';
+      apiState.textContent = '请求中...';
+
+      try {
+        let data;
+        if (action === 'health') {
+          data = await TCMapKit.request('/api/health');
+        } else if (action === 'suggestion') {
+          data = await TCMapKit.request(`/api/tencent/search/suggestion?${TCMapKit.queryString({ keyword: value || '地铁站', region: '深圳' })}`);
+        } else if (action === 'poi') {
+          data = await TCMapKit.request(`/api/tencent/search/poi?${TCMapKit.queryString({ keyword: value || '深圳北站', boundary: 'region(深圳,0)', page_size: 5, page_index: 1 })}`);
+        } else if (action === 'geocode') {
+          data = await TCMapKit.request(`/api/tencent/geo/geocode?${TCMapKit.queryString({ address: value || '深圳北站', region: '深圳' })}`);
+        } else if (action === 'regeo') {
+          data = await TCMapKit.request(`/api/tencent/geo/regeo?${TCMapKit.queryString({ location: '114.0596,22.5315', get_poi: 1 })}`);
+        } else if (action === 'route') {
+          data = await TCMapKit.request(`/api/tencent/route/driving?${TCMapKit.queryString({ from: '22.543096,114.057865', to: '22.61634,114.06341', policy: 0 })}`);
+        }
+        apiState.className = 'badge ok';
+        apiState.textContent = '请求成功';
+        showResult(data);
+      } catch (error) {
+        apiState.className = 'badge warn';
+        apiState.textContent = error.message;
+        showResult({ ok: false, message: error.message, stack: error.stack });
+      }
+    }
+
+    document.querySelectorAll('[data-action]').forEach((button) => {
+      button.addEventListener('click', () => runAction(button.dataset.action));
+    });
+  </script>
+</body>
+</html>

@@ -70,7 +70,7 @@ function mapBox(note) {
   return `
     <div class="map">
       <div>
-        <div><strong>地图区域（高德集成占位）</strong></div>
+        <div><strong>地图区域（腾讯集成占位）</strong></div>
         <div class="muted">地图配置: ${state.mapConfig.enabled ? "后端已配置" : "后端未配置"}</div>
         <div class="muted">${note}</div>
       </div>
@@ -143,7 +143,7 @@ async function saveAdminMapKey() {
   if (!input) return;
   const key = input.value.trim();
 
-  const resp = await fetch("/api/admin/config/amap-key", {
+  const resp = await fetch("/api/admin/config/tencent-key", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ key })
@@ -155,7 +155,7 @@ async function saveAdminMapKey() {
   }
 
   await loadPublicConfig();
-  alert("高德配置已保存到后端（前端不暴露明文）");
+  alert("腾讯配置已保存到后端（前端不暴露明文）");
   render();
 }
 
@@ -374,7 +374,7 @@ function adminScreen(tab) {
       <label>起步价<input id="basePrice" value="${state.pricing.base}" /></label>
       <label>里程单价<input id="kmPrice" value="${state.pricing.perKm}" /></label>
       <button class="btn" onclick="savePricing()">保存计价规则</button>
-      <label>高德 Key（后端保存）<input id="adminGaode" placeholder="输入新 key，前端不回显明文" /></label>
+      <label>腾讯 Key（后端保存）<input id="adminGaode" placeholder="输入新 key，前端不回显明文" /></label>
       <button class="btn alt" onclick="saveAdminMapKey()">保存地图配置</button>
       <p class="muted">当前配置状态：${state.mapConfig.enabled ? `已配置 (${state.mapConfig.keyMask})` : "未配置"}</p>
       <button class="btn alt" onclick="mockLogout()">退出后台</button>
@@ -417,7 +417,7 @@ async function loadPublicConfig() {
     const resp = await fetch("/api/config/public");
     if (!resp.ok) return;
     const data = await resp.json();
-    state.mapConfig = data.amap || state.mapConfig;
+    state.mapConfig = data.tencent || state.mapConfig;
   } catch {
     state.mapConfig = { enabled: false, keyMask: "" };
   }
